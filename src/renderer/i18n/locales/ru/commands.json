@@ -1,0 +1,18 @@
+{
+  "commit": {
+    "label": "Коммит",
+    "description": "Создать git коммит"
+  },
+  "reviewPr": {
+    "label": "Ревью",
+    "description": "Провести ревью pull request"
+  },
+  "help": {
+    "label": "Справка",
+    "description": "Показать справочную информацию"
+  },
+  "clear": {
+    "label": "Очистить",
+    "description": "Очистить терминал"
+  }
+}

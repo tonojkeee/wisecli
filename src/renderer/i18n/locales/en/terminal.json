@@ -1,0 +1,17 @@
+{
+  "status": {
+    "starting": "Starting...",
+    "running": "Running",
+    "idle": "Idle",
+    "error": "Error",
+    "exited": "Exited"
+  },
+  "actions": {
+    "clear": "Clear Terminal",
+    "copy": "Copy",
+    "paste": "Paste",
+    "search": "Search",
+    "newSession": "New Session",
+    "closeSession": "Close Session"
+  }
+}

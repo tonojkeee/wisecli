@@ -1,0 +1,43 @@
+{
+  "buttons": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "reset": "Сбросить",
+    "resetToDefaults": "Сбросить по умолчанию",
+    "clear": "Очистить",
+    "apply": "Применить",
+    "close": "Закрыть",
+    "back": "Назад",
+    "confirm": "Подтвердить",
+    "delete": "Удалить",
+    "create": "Создать",
+    "new": "Новый"
+  },
+  "status": {
+    "loading": "Загрузка...",
+    "saving": "Сохранение...",
+    "error": "Ошибка",
+    "success": "Успешно",
+    "idle": "Ожидание",
+    "running": "Работает",
+    "starting": "Запуск...",
+    "exited": "Завершён"
+  },
+  "units": {
+    "day": "день",
+    "days": "дней",
+    "week": "неделя",
+    "month": "месяц",
+    "year": "год",
+    "ago": "назад",
+    "active": "активен"
+  },
+  "language": {
+    "title": "Язык",
+    "english": "English",
+    "russian": "Русский"
+  },
+  "time": {
+    "lastActivity": "Последняя активность"
+  }
+}

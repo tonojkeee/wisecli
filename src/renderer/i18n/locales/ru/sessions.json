@@ -1,0 +1,15 @@
+{
+  "newSession": "Новая сессия",
+  "createSession": {
+    "title": "Создать новую сессию",
+    "sessionName": "Название сессии",
+    "sessionNamePlaceholder": "Мой проект",
+    "workingDirectory": "Рабочая директория",
+    "workingDirectoryPlaceholder": "/путь/к/проекту",
+    "createButton": "Создать сессию"
+  },
+  "deleteSession": {
+    "title": "Удалить сессию",
+    "confirmMessage": "Вы уверены, что хотите удалить \"{{name}}\"? Это также остановит все запущенные агенты в этой сессии."
+  }
+}

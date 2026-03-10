@@ -1,0 +1,105 @@
+import React from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  GitCommit,
+  GitPullRequest,
+  HelpCircle,
+  Trash2,
+  Terminal
+} from 'lucide-react'
+import { cn } from '@renderer/lib/utils'
+
+interface Command {
+  id: string
+  labelKey: string
+  command: string
+  icon: React.ReactNode
+  shortcut?: string
+  descriptionKey: string
+}
+
+const COMMANDS: Command[] = [
+  {
+    id: 'commit',
+    labelKey: 'commit.label',
+    command: '/commit',
+    icon: <GitCommit className="h-3.5 w-3.5" />,
+    shortcut: '⌃⇧C',
+    descriptionKey: 'commit.description'
+  },
+  {
+    id: 'review-pr',
+    labelKey: 'reviewPr.label',
+    command: '/review-pr',
+    icon: <GitPullRequest className="h-3.5 w-3.5" />,
+    shortcut: '⌃⇧R',
+    descriptionKey: 'reviewPr.description'
+  },
+  {
+    id: 'help',
+    labelKey: 'help.label',
+    command: '/help',
+    icon: <HelpCircle className="h-3.5 w-3.5" />,
+    shortcut: '⌃⇧H',
+    descriptionKey: 'help.description'
+  },
+  {
+    id: 'clear',
+    labelKey: 'clear.label',
+    command: '/clear',
+    icon: <Trash2 className="h-3.5 w-3.5" />,
+    shortcut: '⌃⇧L',
+    descriptionKey: 'clear.description'
+  }
+]
+
+interface CommandPaletteProps {
+  onCommand: (command: string) => void
+  disabled?: boolean
+  className?: string
+}
+
+export function CommandPalette({ onCommand, disabled, className }: CommandPaletteProps) {
+  const { t } = useTranslation('commands')
+
+  return (
+    <div className={cn('grid grid-cols-2 gap-1.5', className)}>
+      {COMMANDS.map((cmd) => (
+        <button
+          key={cmd.id}
+          onClick={() => onCommand(cmd.command)}
+          disabled={disabled}
+          className={cn(
+            'group flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2',
+            'text-left transition-all duration-150',
+            'hover:bg-muted/60 hover:border-muted-foreground/30',
+            'focus:outline-none focus:ring-1 focus:ring-primary/50',
+            'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-muted/30'
+          )}
+          title={t(cmd.descriptionKey)}
+        >
+          <span className="text-muted-foreground transition-colors group-hover:text-foreground">
+            {cmd.icon}
+          </span>
+          <span className="flex-1 text-xs font-medium">{t(cmd.labelKey)}</span>
+          <span className="text-[9px] font-mono text-muted-foreground/60">
+            {cmd.shortcut}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Hook for handling global shortcuts
+export function useCommandShortcuts(
+  callback: (command: string) => void,
+  enabled: boolean = true
+) {
+  React.useEffect(() => {
+    if (!enabled) return
+
+    const unsubscribe = window.electronAPI.shortcuts.onCommand(callback)
+    return unsubscribe
+  }, [callback, enabled])
+}

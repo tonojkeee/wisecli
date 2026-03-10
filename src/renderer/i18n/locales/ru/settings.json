@@ -1,0 +1,175 @@
+{
+  "title": "Настройки",
+  "resetSection": "Сбросить раздел",
+  "resetConfirm": "Сбросить настройки {{section}} к значениям по умолчанию?",
+  "panels": {
+    "appearance": {
+      "title": "Внешний вид",
+      "description": "Настройте внешний вид WiseCLI",
+      "theme": {
+        "title": "Тема",
+        "colorTheme": "Цветовая тема",
+        "colorThemeDesc": "Выберите предпочтительную цветовую схему",
+        "dark": "Тёмная",
+        "light": "Светлая",
+        "system": "Системная",
+        "accentColor": "Акцентный цвет",
+        "accentColorDesc": "Основной акцентный цвет для кнопок и выделений"
+      },
+      "display": {
+        "title": "Отображение",
+        "zoomLevel": "Масштаб",
+        "zoomLevelDesc": "Настройте общий масштаб интерфейса",
+        "fontSize": "Размер шрифта",
+        "fontSizeDesc": "Базовый размер шрифта для интерфейса",
+        "fontFamily": "Шрифт",
+        "fontFamilyDesc": "Моноширинный шрифт для терминала и кода"
+      },
+      "layout": {
+        "title": "Макет",
+        "compactMode": "Компактный режим",
+        "compactModeDesc": "Уменьшить отступы для более плотного интерфейса",
+        "animations": "Анимации",
+        "animationsDesc": "Включить плавные переходы и анимации"
+      },
+      "language": {
+        "title": "Язык",
+        "selectLanguage": "Язык интерфейса",
+        "selectLanguageDesc": "Выберите язык интерфейса"
+      }
+    },
+    "terminal": {
+      "title": "Терминал",
+      "description": "Настройте поведение и внешний вид терминала",
+      "cursor": {
+        "title": "Курсор",
+        "cursorStyle": "Стиль курсора",
+        "cursorStyleDesc": "Выберите форму курсора",
+        "block": "Блок",
+        "underline": "Подчёркивание",
+        "bar": "Строка",
+        "cursorBlink": "Мигание курсора",
+        "cursorBlinkDesc": "Включить мигание курсора"
+      },
+      "scrolling": {
+        "title": "Прокрутка",
+        "scrollbackLines": "Буфер прокрутки",
+        "scrollbackLinesDesc": "Количество строк в истории прокрутки"
+      },
+      "copyPaste": {
+        "title": "Копирование и вставка",
+        "copyOnSelect": "Копировать при выделении",
+        "copyOnSelectDesc": "Автоматически копировать выделенный текст",
+        "rightClickPaste": "Вставка правой кнопкой",
+        "rightClickPasteDesc": "Вставлять из буфера обмена по правому клику"
+      },
+      "bell": {
+        "title": "Сигнал",
+        "bellStyle": "Тип сигнала",
+        "bellStyleDesc": "Уведомление при получении символа звонка",
+        "none": "Нет",
+        "sound": "Звук",
+        "visual": "Визуальный",
+        "both": "Звук и визуальный"
+      }
+    },
+    "behavior": {
+      "title": "Поведение",
+      "description": "Настройте поведение WiseCLI",
+      "startup": {
+        "title": "Запуск",
+        "launchAtLogin": "Запускать при входе",
+        "launchAtLoginDesc": "Автоматически запускать WiseCLI при входе в систему",
+        "restoreSession": "Восстанавливать сессию",
+        "restoreSessionDesc": "Восстанавливать предыдущую сессию при запуске"
+      },
+      "window": {
+        "title": "Окно",
+        "minimizeToTray": "Сворачивать в трей",
+        "minimizeToTrayDesc": "Оставлять приложение в системном трее при сворачивании",
+        "closeBehavior": "Поведение при закрытии",
+        "closeBehaviorDesc": "Что происходит при закрытии окна",
+        "quitApplication": "Выйти из приложения",
+        "minimizeToTrayOption": "Свернуть в трей",
+        "askEveryTime": "Спрашивать каждый раз"
+      }
+    },
+    "shortcuts": {
+      "title": "Горячие клавиши",
+      "description": "Настройте горячие клавиши для частых действий",
+      "globalShortcuts": "Глобальные горячие клавиши",
+      "globalShortcutsDesc": "Работают даже когда WiseCLI не в фокусе",
+      "applicationShortcuts": "Горячие клавиши приложения",
+      "applicationShortcutsDesc": "Работают только когда WiseCLI в фокусе",
+      "clearShortcut": "Очистить горячую клавишу"
+    },
+    "notifications": {
+      "title": "Уведомления",
+      "description": "Настройте параметры уведомлений",
+      "general": {
+        "title": "Общие",
+        "enableNotifications": "Включить уведомления",
+        "enableNotificationsDesc": "Показывать уведомления для важных событий",
+        "systemNotifications": "Системные уведомления",
+        "systemNotificationsDesc": "Использовать центр уведомлений системы",
+        "sound": "Звук",
+        "soundDesc": "Воспроизводить звук с уведомлениями"
+      },
+      "notifyOn": {
+        "title": "Уведомлять о",
+        "agentTaskComplete": "Завершении задачи агента",
+        "agentTaskCompleteDesc": "Когда агент завершает задачу",
+        "agentErrors": "Ошибках агента",
+        "agentErrorsDesc": "Когда агент сталкивается с ошибкой"
+      }
+    },
+    "privacy": {
+      "title": "Конфиденциальность",
+      "description": "Управление настройками конфиденциальности и данных",
+      "telemetry": {
+        "title": "Телеметрия",
+        "anonymousUsageData": "Анонимные данные использования",
+        "anonymousUsageDataDesc": "Помогите улучшить WiseCLI, отправляя анонимную статистику"
+      },
+      "dataRetention": {
+        "title": "Хранение данных",
+        "historyRetention": "Хранение истории",
+        "historyRetentionDesc": "Как долго хранить историю сессий"
+      },
+      "dataLocation": {
+        "title": "Расположение данных",
+        "settingsLocation": "Расположение настроек",
+        "settingsLocationDesc": "Где хранятся ваши настройки",
+        "claudeSettings": "Настройки Claude",
+        "claudeSettingsDesc": "Файл конфигурации Claude CLI"
+      }
+    },
+    "advanced": {
+      "title": "Дополнительно",
+      "description": "Расширенные настройки для опытных пользователей",
+      "proxy": {
+        "title": "Прокси",
+        "enableProxy": "Включить прокси",
+        "enableProxyDesc": "Направлять трафик через прокси-сервер",
+        "proxyUrl": "URL прокси",
+        "proxyUrlDesc": "Адрес HTTP/HTTPS прокси"
+      },
+      "developer": {
+        "title": "Разработчик",
+        "debugMode": "Режим отладки",
+        "debugModeDesc": "Включить функции отладки и подробное логирование",
+        "logLevel": "Уровень логирования",
+        "logLevelDesc": "Минимальный уровень логов для отображения",
+        "debug": "Отладка",
+        "info": "Информация",
+        "warning": "Предупреждение",
+        "error": "Ошибка"
+      },
+      "dangerZone": {
+        "title": "Опасная зона",
+        "resetAllSettings": "Сбросить все настройки",
+        "resetAllSettingsDesc": "Это сбросит все настройки приложения к значениям по умолчанию. Настройки Claude CLI и сессии не будут затронуты."
+      }
+    }
+  }
+}

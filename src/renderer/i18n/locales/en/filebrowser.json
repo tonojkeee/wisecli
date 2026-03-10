@@ -1,0 +1,45 @@
+{
+  "title": "Files",
+  "noProject": "No project open",
+  "noProjectSelected": "No project selected",
+  "selectOrCreateSession": "Select or create a session to browse files",
+  "emptyFolder": "Empty folder",
+  "refresh": "Refresh",
+  "fileTree": "File tree",
+
+  "contextMenu": {
+    "newFile": "New File",
+    "newFolder": "New Folder",
+    "rename": "Rename",
+    "delete": "Delete",
+    "copyPath": "Copy Path",
+    "refresh": "Refresh",
+    "open": "Open"
+  },
+
+  "dialogs": {
+    "createFile": {
+      "title": "Create New File",
+      "description": "Enter a name for the new file",
+      "placeholder": "filename.ext",
+      "create": "Create"
+    },
+    "createFolder": {
+      "title": "Create New Folder",
+      "description": "Enter a name for the new folder",
+      "placeholder": "folder name",
+      "create": "Create"
+    },
+    "rename": {
+      "title": "Rename",
+      "description": "Enter a new name",
+      "rename": "Rename"
+    },
+    "delete": {
+      "title": "Delete",
+      "description": "Are you sure you want to delete \"{{name}}\"?",
+      "delete": "Delete",
+      "cancel": "Cancel"
+    }
+  }
+}

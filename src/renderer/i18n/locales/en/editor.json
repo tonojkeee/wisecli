@@ -1,0 +1,18 @@
+{
+  "title": "Editor",
+  "noFileSelected": "No file selected",
+  "selectFileToEdit": "Select a file from the browser to edit",
+  "unsavedChanges": "Unsaved changes",
+  "save": "Save",
+  "saveAll": "Save All",
+  "closeAll": "Close All",
+  "close": "Close",
+  "saving": "Saving...",
+  "saved": "Saved",
+  "saveError": "Failed to save file",
+  "loadError": "Failed to load file",
+  "closeConfirm": "This file has unsaved changes. Close anyway?",
+  "closeConfirmTitle": "Unsaved Changes",
+  "continueEditing": "Continue Editing",
+  "discardChanges": "Discard Changes"
+}

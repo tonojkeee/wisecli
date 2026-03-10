@@ -1,0 +1,45 @@
+{
+  "title": "Файлы",
+  "noProject": "Проект не открыт",
+  "noProjectSelected": "Проект не выбран",
+  "selectOrCreateSession": "Выберите или создайте сессию для просмотра файлов",
+  "emptyFolder": "Папка пуста",
+  "refresh": "Обновить",
+  "fileTree": "Дерево файлов",
+
+  "contextMenu": {
+    "newFile": "Новый файл",
+    "newFolder": "Новая папка",
+    "rename": "Переименовать",
+    "delete": "Удалить",
+    "copyPath": "Копировать путь",
+    "refresh": "Обновить",
+    "open": "Открыть"
+  },
+
+  "dialogs": {
+    "createFile": {
+      "title": "Создать новый файл",
+      "description": "Введите имя нового файла",
+      "placeholder": "имя_файла.расширение",
+      "create": "Создать"
+    },
+    "createFolder": {
+      "title": "Создать новую папку",
+      "description": "Введите имя новой папки",
+      "placeholder": "имя папки",
+      "create": "Создать"
+    },
+    "rename": {
+      "title": "Переименовать",
+      "description": "Введите новое имя",
+      "rename": "Переименовать"
+    },
+    "delete": {
+      "title": "Удалить",
+      "description": "Вы уверены, что хотите удалить \"{{name}}\"?",
+      "delete": "Удалить",
+      "cancel": "Отмена"
+    }
+  }
+}

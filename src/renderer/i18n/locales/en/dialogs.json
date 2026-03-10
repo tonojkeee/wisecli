@@ -1,0 +1,13 @@
+{
+  "confirm": {
+    "resetSettings": "Are you sure you want to reset all settings to their defaults? This cannot be undone.",
+    "resetSection": "Reset {{section}} settings to defaults?",
+    "deleteSession": "Are you sure you want to delete this session?",
+    "closeSession": "Do you want to close this session?"
+  },
+  "titles": {
+    "settings": "Settings",
+    "about": "About",
+    "shortcuts": "Keyboard Shortcuts"
+  }
+}

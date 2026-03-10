@@ -1,0 +1,175 @@
+{
+  "title": "Settings",
+  "resetSection": "Reset Section",
+  "resetConfirm": "Reset {{section}} settings to defaults?",
+  "panels": {
+    "appearance": {
+      "title": "Appearance",
+      "description": "Customize how WiseCLI looks",
+      "theme": {
+        "title": "Theme",
+        "colorTheme": "Color Theme",
+        "colorThemeDesc": "Choose your preferred color scheme",
+        "dark": "Dark",
+        "light": "Light",
+        "system": "System",
+        "accentColor": "Accent Color",
+        "accentColorDesc": "Primary accent color for buttons and highlights"
+      },
+      "display": {
+        "title": "Display",
+        "zoomLevel": "Zoom Level",
+        "zoomLevelDesc": "Adjust the overall interface scale",
+        "fontSize": "Font Size",
+        "fontSizeDesc": "Base font size for the interface",
+        "fontFamily": "Font Family",
+        "fontFamilyDesc": "Monospace font for terminal and code"
+      },
+      "layout": {
+        "title": "Layout",
+        "compactMode": "Compact Mode",
+        "compactModeDesc": "Reduce spacing and padding for a denser interface",
+        "animations": "Animations",
+        "animationsDesc": "Enable smooth transitions and animations"
+      },
+      "language": {
+        "title": "Language",
+        "selectLanguage": "Interface Language",
+        "selectLanguageDesc": "Choose the language for the interface"
+      }
+    },
+    "terminal": {
+      "title": "Terminal",
+      "description": "Configure terminal behavior and appearance",
+      "cursor": {
+        "title": "Cursor",
+        "cursorStyle": "Cursor Style",
+        "cursorStyleDesc": "Choose the shape of the cursor",
+        "block": "Block",
+        "underline": "Underline",
+        "bar": "Bar",
+        "cursorBlink": "Cursor Blink",
+        "cursorBlinkDesc": "Make the cursor blink"
+      },
+      "scrolling": {
+        "title": "Scrolling",
+        "scrollbackLines": "Scrollback Lines",
+        "scrollbackLinesDesc": "Number of lines to keep in scroll history"
+      },
+      "copyPaste": {
+        "title": "Copy & Paste",
+        "copyOnSelect": "Copy on Select",
+        "copyOnSelectDesc": "Automatically copy selected text to clipboard",
+        "rightClickPaste": "Right Click Paste",
+        "rightClickPasteDesc": "Paste from clipboard on right click"
+      },
+      "bell": {
+        "title": "Bell",
+        "bellStyle": "Bell Style",
+        "bellStyleDesc": "Notification when bell character is received",
+        "none": "None",
+        "sound": "Sound",
+        "visual": "Visual",
+        "both": "Sound & Visual"
+      }
+    },
+    "behavior": {
+      "title": "Behavior",
+      "description": "Configure how WiseCLI behaves",
+      "startup": {
+        "title": "Startup",
+        "launchAtLogin": "Launch at Login",
+        "launchAtLoginDesc": "Automatically start WiseCLI when you log in",
+        "restoreSession": "Restore Session",
+        "restoreSessionDesc": "Restore previous session on startup"
+      },
+      "window": {
+        "title": "Window",
+        "minimizeToTray": "Minimize to System Tray",
+        "minimizeToTrayDesc": "Keep the app running in the system tray when minimized",
+        "closeBehavior": "Close Behavior",
+        "closeBehaviorDesc": "What happens when you close the window",
+        "quitApplication": "Quit Application",
+        "minimizeToTrayOption": "Minimize to Tray",
+        "askEveryTime": "Ask Every Time"
+      }
+    },
+    "shortcuts": {
+      "title": "Keyboard Shortcuts",
+      "description": "Customize keyboard shortcuts for common actions",
+      "globalShortcuts": "Global Shortcuts",
+      "globalShortcutsDesc": "Work even when WiseCLI is not focused",
+      "applicationShortcuts": "Application Shortcuts",
+      "applicationShortcutsDesc": "Work only when WiseCLI is focused",
+      "clearShortcut": "Clear shortcut"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Configure notification preferences",
+      "general": {
+        "title": "General",
+        "enableNotifications": "Enable Notifications",
+        "enableNotificationsDesc": "Show notifications for important events",
+        "systemNotifications": "System Notifications",
+        "systemNotificationsDesc": "Use system notification center",
+        "sound": "Sound",
+        "soundDesc": "Play a sound with notifications"
+      },
+      "notifyOn": {
+        "title": "Notify On",
+        "agentTaskComplete": "Agent Task Complete",
+        "agentTaskCompleteDesc": "When an agent finishes a task",
+        "agentErrors": "Agent Errors",
+        "agentErrorsDesc": "When an agent encounters an error"
+      }
+    },
+    "privacy": {
+      "title": "Privacy",
+      "description": "Manage your privacy and data settings",
+      "telemetry": {
+        "title": "Telemetry",
+        "anonymousUsageData": "Anonymous Usage Data",
+        "anonymousUsageDataDesc": "Help improve WiseCLI by sending anonymous usage statistics"
+      },
+      "dataRetention": {
+        "title": "Data Retention",
+        "historyRetention": "History Retention",
+        "historyRetentionDesc": "How long to keep session history"
+      },
+      "dataLocation": {
+        "title": "Data Location",
+        "settingsLocation": "Settings Location",
+        "settingsLocationDesc": "Where your settings are stored",
+        "claudeSettings": "Claude Settings",
+        "claudeSettingsDesc": "Claude CLI configuration file"
+      }
+    },
+    "advanced": {
+      "title": "Advanced",
+      "description": "Advanced settings for power users",
+      "proxy": {
+        "title": "Proxy",
+        "enableProxy": "Enable Proxy",
+        "enableProxyDesc": "Route traffic through a proxy server",
+        "proxyUrl": "Proxy URL",
+        "proxyUrlDesc": "HTTP/HTTPS proxy address"
+      },
+      "developer": {
+        "title": "Developer",
+        "debugMode": "Debug Mode",
+        "debugModeDesc": "Enable debug features and verbose logging",
+        "logLevel": "Log Level",
+        "logLevelDesc": "Minimum log level to display",
+        "debug": "Debug",
+        "info": "Info",
+        "warning": "Warning",
+        "error": "Error"
+      },
+      "dangerZone": {
+        "title": "Danger Zone",
+        "resetAllSettings": "Reset All Settings",
+        "resetAllSettingsDesc": "This will reset all application settings to their default values. Your Claude CLI settings and sessions will not be affected."
+      }
+    }
+  }
+}

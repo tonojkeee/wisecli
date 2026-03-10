@@ -1,0 +1,34 @@
+{
+  "title": "WiseCLI",
+  "subtitle": "Графический интерфейс для Claude CLI",
+  "header": {
+    "appSettings": "Настройки приложения",
+    "claudeApiSettings": "Настройки Claude API",
+    "exportLogs": "Экспорт логов"
+  },
+  "sidebar": {
+    "files": "Файлы",
+    "agents": "Агенты"
+  },
+  "terminal": {
+    "noAgentSelected": "Агент не выбран",
+    "selectOrStartAgent": "Выберите или запустите агент из боковой панели"
+  },
+  "claudeSettings": {
+    "title": "Настройки Claude API",
+    "description": "Настройте параметры Claude CLI API. Изменения сохраняются в ~/.claude/settings.json",
+    "apiConfiguration": "Конфигурация API",
+    "authToken": "Токен авторизации",
+    "authTokenPlaceholder": "Ваш API токен Anthropic",
+    "baseUrl": "Базовый URL (опционально)",
+    "baseUrlPlaceholder": "https://api.anthropic.com",
+    "defaultModels": "Модели по умолчанию",
+    "haiku": "Haiku",
+    "sonnet": "Sonnet",
+    "opus": "Opus",
+    "advanced": "Дополнительно",
+    "apiTimeout": "Таймаут API (мс)",
+    "experimentalTeams": "Включить экспериментальные команды агентов",
+    "saveSettings": "Сохранить настройки"
+  }
+}

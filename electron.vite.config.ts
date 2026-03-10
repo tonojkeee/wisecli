@@ -36,6 +36,9 @@ export default defineConfig({
           index: resolve(__dirname, 'src/renderer/index.html')
         }
       }
+    },
+    optimizeDeps: {
+      include: ['monaco-editor']
     }
   }
 })

@@ -1,0 +1,19 @@
+{
+  "title": "Agents",
+  "running": "running",
+  "quickActions": "Quick Actions",
+  "startNewAgent": "Start new agent",
+  "stopAgent": "Stop agent",
+  "noAgentsYet": "No agents yet",
+  "clickNewToStart": "Click \"New\" to start your first agent",
+  "lastActivity": "Last activity",
+  "ago": "ago",
+  "new": "New",
+  "status": {
+    "starting": "Starting...",
+    "running": "Running",
+    "idle": "Idle",
+    "error": "Error",
+    "exited": "Exited"
+  }
+}

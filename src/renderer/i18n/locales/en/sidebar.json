@@ -1,0 +1,11 @@
+{
+  "navigation": {
+    "appearance": "Appearance",
+    "terminal": "Terminal",
+    "behavior": "Behavior",
+    "shortcuts": "Shortcuts",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "advanced": "Advanced"
+  }
+}

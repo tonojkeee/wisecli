@@ -1,0 +1,43 @@
+{
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "reset": "Reset",
+    "resetToDefaults": "Reset to Defaults",
+    "clear": "Clear",
+    "apply": "Apply",
+    "close": "Close",
+    "back": "Back",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "create": "Create",
+    "new": "New"
+  },
+  "status": {
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "error": "Error",
+    "success": "Success",
+    "idle": "Idle",
+    "running": "Running",
+    "starting": "Starting...",
+    "exited": "Exited"
+  },
+  "units": {
+    "day": "day",
+    "days": "days",
+    "week": "week",
+    "month": "month",
+    "year": "year",
+    "ago": "ago",
+    "active": "active"
+  },
+  "language": {
+    "title": "Language",
+    "english": "English",
+    "russian": "Русский"
+  },
+  "time": {
+    "lastActivity": "Last activity"
+  }
+}

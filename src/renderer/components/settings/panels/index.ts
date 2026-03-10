@@ -1,0 +1,7 @@
+export * from './AppearancePanel'
+export * from './TerminalPanel'
+export * from './BehaviorPanel'
+export * from './ShortcutsPanel'
+export * from './NotificationsPanel'
+export * from './PrivacyPanel'
+export * from './AdvancedPanel'

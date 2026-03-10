@@ -1,0 +1,18 @@
+{
+  "commit": {
+    "label": "Commit",
+    "description": "Create a git commit"
+  },
+  "reviewPr": {
+    "label": "Review",
+    "description": "Review a pull request"
+  },
+  "help": {
+    "label": "Help",
+    "description": "Show help information"
+  },
+  "clear": {
+    "label": "Clear",
+    "description": "Clear the terminal"
+  }
+}

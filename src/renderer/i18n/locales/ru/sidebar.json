@@ -1,0 +1,11 @@
+{
+  "navigation": {
+    "appearance": "Внешний вид",
+    "terminal": "Терминал",
+    "behavior": "Поведение",
+    "shortcuts": "Горячие клавиши",
+    "notifications": "Уведомления",
+    "privacy": "Конфиденциальность",
+    "advanced": "Дополнительно"
+  }
+}
