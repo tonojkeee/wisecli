@@ -435,7 +435,14 @@ const electronAPI = {
       const handler = (_event: IpcRendererEvent, result: GitStatusResult) => callback(result)
       ipcRenderer.on('git:status-changed', handler)
       return () => ipcRenderer.removeListener('git:status-changed', handler)
-    }
+    },
+
+    getFileAtRef: (
+      repoPath: string,
+      filePath: string,
+      ref?: string
+    ): Promise<string | null> =>
+      ipcRenderer.invoke('git:get-file-at-ref', repoPath, filePath, ref)
   }
 }
 

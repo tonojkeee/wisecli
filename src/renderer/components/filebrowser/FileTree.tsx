@@ -43,6 +43,7 @@ export function FileTree({
   const selectedPath = useFileStore((state) => state.selectedPath)
   const gitStatus = useFileStore((state) => state.gitStatus)
   const getFileGitStatus = useFileStore((state) => state.getFileGitStatus)
+  const getFolderGitStatus = useFileStore((state) => state.getFolderGitStatus)
   const toggleFolder = useFileStore((state) => state.toggleFolder)
   const expandFolder = useFileStore((state) => state.expandFolder)
   const selectPath = useFileStore((state) => state.selectPath)
@@ -202,6 +203,7 @@ export function FileTree({
             isExpanded={isExpanded}
             isSelected={isSelected}
             gitStatus={getFileGitStatus(entry.path)}
+            folderGitStatus={entry.isDirectory ? getFolderGitStatus(entry.path) : undefined}
             onToggle={toggleFolder}
             onSelect={selectPath}
             onOpenFile={openFile}

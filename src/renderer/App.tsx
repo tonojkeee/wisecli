@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Settings, Download, Save, RotateCcw, Terminal, FolderOpen, Users } from 'lucide-react'
 import { TerminalView, useTerminalManager } from '@renderer/components/terminal'
@@ -66,8 +66,7 @@ function App() {
   const appTerminal = useTerminalSettings()
   const effectiveTheme = useEffectiveTheme()
 
-  // Agent store
-  const agents = useAgentStore((state) => Array.from(state.agents.values()))
+  // Agent store - use shallow comparison for actions, avoid creating new arrays
   const activeAgent = useActiveAgent()
   const activeAgentId = useAgentStore((state) => state.activeAgentId)
   const setActiveAgent = useAgentStore((state) => state.setActiveAgent)
@@ -84,8 +83,12 @@ function App() {
   const addSession = useSessionStore((state) => state.addSession)
   const removeSession = useSessionStore((state) => state.removeSession)
 
-  // Get agents for active session
-  const sessionAgents = useAgentsBySession(activeSessionId || '')
+  // Get agents for active session - use selector + useMemo to prevent unnecessary re-renders
+  const agentsMap = useAgentStore((state) => state.agents)
+  const sessionAgents = useMemo(() => {
+    if (!activeSessionId) return []
+    return Array.from(agentsMap.values()).filter((a) => a.sessionId === activeSessionId)
+  }, [agentsMap, activeSessionId])
 
   // Get open files for editor panel visibility
   const openFiles = useFileStore((state) => state.openFiles)
@@ -224,8 +227,9 @@ function App() {
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
-      // Kill all agents in session
-      const sessionAgents = agents.filter((a) => a.sessionId === sessionId)
+      // Kill all agents in session - get directly from store to avoid selector
+      const allAgents = Array.from(useAgentStore.getState().agents.values())
+      const sessionAgents = allAgents.filter((a) => a.sessionId === sessionId)
       for (const agent of sessionAgents) {
         await window.electronAPI.agent.kill(agent.id)
         removeAgent(agent.id)

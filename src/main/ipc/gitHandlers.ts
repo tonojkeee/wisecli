@@ -59,4 +59,17 @@ export function registerGitHandlers(): void {
       return false
     }
   })
+
+  // Get file content at a specific git reference
+  ipcMain.handle(
+    'git:get-file-at-ref',
+    async (_event, repoPath: string, filePath: string, ref: string = 'HEAD') => {
+      try {
+        return await gitService.getFileAtRef(repoPath, filePath, ref)
+      } catch (error) {
+        console.error('[gitHandlers] get-file-at-ref error:', error)
+        return null
+      }
+    }
+  )
 }

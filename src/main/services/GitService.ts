@@ -328,6 +328,31 @@ class GitService {
       console.debug('[GitService] notifyStatusChanged error:', error)
     }
   }
+
+  /**
+   * Get file content at a specific git reference (e.g., HEAD, commit hash, branch name)
+   * Returns null if the file doesn't exist at that reference
+   */
+  async getFileAtRef(repoPath: string, filePath: string, ref: string = 'HEAD'): Promise<string | null> {
+    try {
+      // Get the relative path from repo root
+      const relativePath = filePath.startsWith(repoPath)
+        ? filePath.slice(repoPath.length + 1)
+        : filePath
+
+      // Use git show to get file content at specific ref
+      const { stdout } = await execAsync(`git show ${ref}:${relativePath}`, {
+        cwd: repoPath,
+        maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large files
+      })
+
+      return stdout
+    } catch (error) {
+      // File might not exist at this ref, or ref might be invalid
+      console.debug('[GitService] getFileAtRef error:', error)
+      return null
+    }
+  }
 }
 
 export const gitService = new GitService()

@@ -80,6 +80,7 @@ interface FileState {
   startGitWatching: () => Promise<void>
   stopGitWatching: () => Promise<void>
   getFileGitStatus: (filePath: string) => GitFileStatus | null
+  getFolderGitStatus: (folderPath: string) => { hasChanges: boolean; changedCount: number; statuses: string[] }
 }
 
 // Map file extension to Monaco language
@@ -507,6 +508,36 @@ export const useFileStore = create<FileState>((set, get) => ({
 
     const entry = gitStatus.entries.find(e => e.path === relativePath)
     return entry?.status || null
+  },
+
+  /**
+   * Check if a folder contains any changed files (recursively)
+   * Returns the count of changed files and their statuses
+   */
+  getFolderGitStatus: (folderPath) => {
+    const { gitStatus, projectPath } = get()
+    if (!gitStatus || !gitStatus.isGitRepo || !projectPath) {
+      return { hasChanges: false, changedCount: 0, statuses: [] }
+    }
+
+    // Get relative path from project root
+    const relativeFolderPath = folderPath.startsWith(projectPath)
+      ? folderPath.slice(projectPath.length + 1)
+      : folderPath
+
+    // Find all entries that are inside this folder
+    const folderPrefix = relativeFolderPath ? `${relativeFolderPath}/` : ''
+    const changedEntries = gitStatus.entries.filter(e =>
+      e.path === relativeFolderPath || e.path.startsWith(folderPrefix)
+    )
+
+    const statuses = [...new Set(changedEntries.map(e => e.status))]
+
+    return {
+      hasChanges: changedEntries.length > 0,
+      changedCount: changedEntries.length,
+      statuses
+    }
   }
 }))
 

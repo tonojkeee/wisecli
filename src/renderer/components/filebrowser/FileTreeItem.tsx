@@ -26,6 +26,7 @@ interface FileTreeItemProps {
   isExpanded: boolean
   isSelected: boolean
   gitStatus?: GitFileStatus | null
+  folderGitStatus?: { hasChanges: boolean; changedCount: number; statuses: string[] }
   onToggle: (path: string) => void
   onSelect: (path: string) => void
   onOpenFile: (path: string) => void
@@ -67,6 +68,7 @@ export function FileTreeItem({
   isExpanded,
   isSelected,
   gitStatus,
+  folderGitStatus,
   onToggle,
   onSelect,
   onOpenFile,
@@ -143,7 +145,17 @@ export function FileTreeItem({
         {/* Name */}
         <span className="truncate">{entry.name}</span>
 
-        {/* Git status badge */}
+        {/* Folder git status indicator - shows count of changed files inside */}
+        {entry.isDirectory && folderGitStatus?.hasChanges && (
+          <span
+            className="ml-1 rounded-full bg-amber-500/20 px-1.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+            title={`${folderGitStatus.changedCount} changed file${folderGitStatus.changedCount > 1 ? 's' : ''} inside`}
+          >
+            {folderGitStatus.changedCount}
+          </span>
+        )}
+
+        {/* Git status badge for files */}
         {gitStatus && (
           <span
             className={cn(

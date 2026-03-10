@@ -1,5 +1,9 @@
 import { create } from 'zustand'
 
+// Cleanup functions for event listeners (prevents memory leak on repeated loadSettings calls)
+let settingsUnsubscribe: (() => void) | null = null
+let themeUnsubscribe: (() => void) | null = null
+
 // Types - must match preload/index.ts
 export interface AppearanceSettings {
   theme: 'dark' | 'light' | 'system'
@@ -103,12 +107,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const effectiveTheme = await window.electronAPI.appSettings.getEffectiveTheme()
       set({ settings, effectiveTheme, isLoading: false })
 
-      // Set up listeners for settings changes
-      window.electronAPI.appSettings.onChanged((newSettings) => {
+      // Cleanup old listeners first to prevent memory leak
+      if (settingsUnsubscribe) {
+        settingsUnsubscribe()
+        settingsUnsubscribe = null
+      }
+      if (themeUnsubscribe) {
+        themeUnsubscribe()
+        themeUnsubscribe = null
+      }
+
+      // Set up listeners for settings changes and store unsubscribe functions
+      settingsUnsubscribe = window.electronAPI.appSettings.onChanged((newSettings) => {
         set({ settings: newSettings })
       })
 
-      window.electronAPI.appSettings.onThemeChanged((theme) => {
+      themeUnsubscribe = window.electronAPI.appSettings.onThemeChanged((theme) => {
         set({ effectiveTheme: theme })
       })
     } catch (error) {

@@ -30,6 +30,13 @@ class AgentProcessManager extends EventEmitter {
   private outputBuffers: Map<string, string[]> = new Map()
   private readonly MAX_BUFFER_SIZE = 1000
 
+  // Output batching to prevent IPC flooding
+  private pendingOutputs: Map<string, { data: string; timestamp: number }[]> = new Map()
+  private flushTimeouts: Map<string, NodeJS.Timeout> = new Map()
+  private statusTimeouts: Map<string, NodeJS.Timeout> = new Map()
+  private readonly OUTPUT_BATCH_MS = 100  // Increased from 50ms
+  private readonly MAX_BATCH_SIZE = 100   // Increased from 50
+
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window
   }
@@ -86,8 +93,8 @@ class AgentProcessManager extends EventEmitter {
       this.handleAgentExit(agentId, exitCode)
     })
 
-    // Set status to running after brief delay
-    setTimeout(() => {
+    // Set status to running after brief delay (track timeout for cleanup)
+    const statusTimeout = setTimeout(() => {
       const currentAgent = this.agents.get(agentId)
       console.log('[AgentProcessManager] Timeout fired for agent:', agentId, 'status:', currentAgent?.status)
       if (currentAgent && currentAgent.status === 'starting') {
@@ -96,7 +103,9 @@ class AgentProcessManager extends EventEmitter {
         console.log('[AgentProcessManager] Sending status to renderer, mainWindow:', !!this.mainWindow)
         this.sendToRenderer('agent:status', { agentId, status: 'running' })
       }
+      this.statusTimeouts.delete(agentId)
     }, 500)
+    this.statusTimeouts.set(agentId, statusTimeout)
 
     this.emit('agent:created', agent)
     return agent
@@ -116,11 +125,56 @@ class AgentProcessManager extends EventEmitter {
     }
     this.outputBuffers.set(agentId, buffer)
 
+    // Batch output instead of immediate send to prevent IPC flooding
+    this.batchOutput(agentId, data)
+  }
+
+  private batchOutput(agentId: string, data: string): void {
+    let batch = this.pendingOutputs.get(agentId) || []
+    batch.push({ data, timestamp: Date.now() })
+    this.pendingOutputs.set(agentId, batch)
+
+    // Flush immediately if batch is full
+    if (batch.length >= this.MAX_BATCH_SIZE) {
+      this.flushOutputBatch(agentId)
+      return
+    }
+
+    // Schedule flush if not already scheduled
+    if (!this.flushTimeouts.has(agentId)) {
+      this.flushTimeouts.set(
+        agentId,
+        setTimeout(() => this.flushOutputBatch(agentId), this.OUTPUT_BATCH_MS)
+      )
+    }
+  }
+
+  private flushOutputBatch(agentId: string): void {
+    // Clear the timeout
+    const timeout = this.flushTimeouts.get(agentId)
+    if (timeout) {
+      clearTimeout(timeout)
+      this.flushTimeouts.delete(agentId)
+    }
+
+    // Get and clear the batch
+    const batch = this.pendingOutputs.get(agentId)
+    if (!batch || batch.length === 0) {
+      this.pendingOutputs.delete(agentId)
+      return
+    }
+
+    this.pendingOutputs.delete(agentId)
+
+    // Combine all data into a single message
+    const combinedData = batch.map(b => b.data).join('')
+    const latestTimestamp = batch[batch.length - 1].timestamp
+
     // Send to renderer
     this.sendToRenderer('agent:output', {
       agentId,
-      data,
-      timestamp: Date.now()
+      data: combinedData,
+      timestamp: latestTimestamp
     })
   }
 
@@ -153,6 +207,22 @@ class AgentProcessManager extends EventEmitter {
   killAgent(agentId: string): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
+
+    // Clear all timeouts for this agent
+    const statusTimeout = this.statusTimeouts.get(agentId)
+    if (statusTimeout) {
+      clearTimeout(statusTimeout)
+      this.statusTimeouts.delete(agentId)
+    }
+
+    const flushTimeout = this.flushTimeouts.get(agentId)
+    if (flushTimeout) {
+      clearTimeout(flushTimeout)
+      this.flushTimeouts.delete(agentId)
+    }
+
+    // Clear pending outputs
+    this.pendingOutputs.delete(agentId)
 
     try {
       agent.pty.kill()
@@ -189,6 +259,22 @@ class AgentProcessManager extends EventEmitter {
   }
 
   cleanup(): void {
+    // Clear all status timeouts
+    for (const timeout of this.statusTimeouts.values()) {
+      clearTimeout(timeout)
+    }
+    this.statusTimeouts.clear()
+
+    // Clear all flush timeouts
+    for (const timeout of this.flushTimeouts.values()) {
+      clearTimeout(timeout)
+    }
+    this.flushTimeouts.clear()
+
+    // Clear pending outputs
+    this.pendingOutputs.clear()
+
+    // Kill all agents
     for (const agentId of this.agents.keys()) {
       this.killAgent(agentId)
     }
