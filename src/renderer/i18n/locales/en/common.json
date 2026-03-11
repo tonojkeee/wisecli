@@ -39,5 +39,17 @@
   },
   "time": {
     "lastActivity": "Last activity"
+  },
+  "toasts": {
+    "failedToLoadSettings": "Failed to load Claude settings",
+    "failedToSaveSettings": "Failed to save settings",
+    "failedToLoadSessions": "Failed to load sessions",
+    "failedToLoadAgents": "Failed to load agents",
+    "failedToCreateSession": "Failed to create session",
+    "failedToDeleteSession": "Failed to delete session",
+    "failedToStartAgent": "Failed to start agent",
+    "failedToKillAgent": "Failed to kill agent",
+    "failedToExportLogs": "Failed to export logs",
+    "settingsSaved": "Settings saved successfully"
   }
 }

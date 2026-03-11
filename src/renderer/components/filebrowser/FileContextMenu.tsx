@@ -1,33 +1,24 @@
-import React, { useEffect, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
-import {
-  File,
-  FolderPlus,
-  FilePlus,
-  Pencil,
-  Trash2,
-  Copy,
-  Clipboard,
-  RefreshCw
-} from 'lucide-react'
-import { cn } from '@renderer/lib/utils'
+import React, { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import { File, FolderPlus, FilePlus, Pencil, Trash2, Copy, RefreshCw } from "lucide-react";
+import { cn } from "@renderer/lib/utils";
 
 export interface ContextMenuPosition {
-  x: number
-  y: number
+  x: number;
+  y: number;
 }
 
 interface FileContextMenuProps {
-  position: ContextMenuPosition
-  targetPath: string | null
-  isDirectory: boolean
-  onClose: () => void
-  onCreateFile: (parentPath: string) => void
-  onCreateDirectory: (parentPath: string) => void
-  onRename: (path: string) => void
-  onDelete: (path: string) => void
-  onCopyPath?: (path: string) => void
-  onRefresh?: (path: string) => void
+  position: ContextMenuPosition;
+  targetPath: string | null;
+  isDirectory: boolean;
+  onClose: () => void;
+  onCreateFile: (parentPath: string) => void;
+  onCreateDirectory: (parentPath: string) => void;
+  onRename: (path: string) => void;
+  onDelete: (path: string) => void;
+  onCopyPath?: (path: string) => void;
+  onRefresh?: (path: string) => void;
 }
 
 export function FileContextMenu({
@@ -40,127 +31,127 @@ export function FileContextMenu({
   onRename,
   onDelete,
   onCopyPath,
-  onRefresh
+  onRefresh,
 }: FileContextMenuProps) {
-  const { t } = useTranslation('filebrowser')
-  const menuRef = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation("filebrowser");
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Close on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose()
+        onClose();
       }
-    }
+    };
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
+      if (e.key === "Escape") {
+        onClose();
       }
-    }
+    };
 
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [onClose])
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [onClose]);
 
   // Adjust position to stay within viewport
-  const adjustedPosition = { ...position }
+  const adjustedPosition = { ...position };
   if (menuRef.current) {
-    const rect = menuRef.current.getBoundingClientRect()
+    const rect = menuRef.current.getBoundingClientRect();
     if (position.x + rect.width > window.innerWidth) {
-      adjustedPosition.x = window.innerWidth - rect.width - 10
+      adjustedPosition.x = window.innerWidth - rect.width - 10;
     }
     if (position.y + rect.height > window.innerHeight) {
-      adjustedPosition.y = window.innerHeight - rect.height - 10
+      adjustedPosition.y = window.innerHeight - rect.height - 10;
     }
   }
 
   const handleCreateFile = () => {
     if (targetPath) {
-      onCreateFile(targetPath)
-      onClose()
+      onCreateFile(targetPath);
+      onClose();
     }
-  }
+  };
 
   const handleCreateDirectory = () => {
     if (targetPath) {
-      onCreateDirectory(targetPath)
-      onClose()
+      onCreateDirectory(targetPath);
+      onClose();
     }
-  }
+  };
 
   const handleRename = () => {
     if (targetPath) {
-      onRename(targetPath)
-      onClose()
+      onRename(targetPath);
+      onClose();
     }
-  }
+  };
 
   const handleDelete = () => {
     if (targetPath) {
-      onDelete(targetPath)
-      onClose()
+      onDelete(targetPath);
+      onClose();
     }
-  }
+  };
 
   const handleCopyPath = () => {
     if (targetPath && onCopyPath) {
-      onCopyPath(targetPath)
-      onClose()
+      onCopyPath(targetPath);
+      onClose();
     }
-  }
+  };
 
   const handleRefresh = () => {
     if (targetPath && onRefresh) {
-      onRefresh(targetPath)
-      onClose()
+      onRefresh(targetPath);
+      onClose();
     }
-  }
+  };
 
   return (
     <div
       ref={menuRef}
       className={cn(
-        'fixed z-50 min-w-[160px] rounded-md border bg-popover p-1 shadow-md',
-        'animate-in fade-in-0 zoom-in-95'
+        "fixed z-50 min-w-[160px] rounded-md border bg-popover p-1 shadow-md",
+        "animate-in fade-in-0 zoom-in-95"
       )}
       style={{
         left: adjustedPosition.x,
-        top: adjustedPosition.y
+        top: adjustedPosition.y,
       }}
     >
       {isDirectory ? (
         <>
           <ContextMenuItem
             icon={<FilePlus className="h-4 w-4" />}
-            label={t('contextMenu.newFile')}
+            label={t("contextMenu.newFile")}
             onClick={handleCreateFile}
           />
           <ContextMenuItem
             icon={<FolderPlus className="h-4 w-4" />}
-            label={t('contextMenu.newFolder')}
+            label={t("contextMenu.newFolder")}
             onClick={handleCreateDirectory}
           />
           <ContextMenuSeparator />
           <ContextMenuItem
             icon={<RefreshCw className="h-4 w-4" />}
-            label={t('contextMenu.refresh')}
+            label={t("contextMenu.refresh")}
             onClick={handleRefresh}
           />
           <ContextMenuSeparator />
           <ContextMenuItem
             icon={<Pencil className="h-4 w-4" />}
-            label={t('contextMenu.rename')}
+            label={t("contextMenu.rename")}
             onClick={handleRename}
           />
           <ContextMenuItem
             icon={<Trash2 className="h-4 w-4" />}
-            label={t('contextMenu.delete')}
+            label={t("contextMenu.delete")}
             onClick={handleDelete}
             destructive
           />
@@ -169,38 +160,38 @@ export function FileContextMenu({
         <>
           <ContextMenuItem
             icon={<File className="h-4 w-4" />}
-            label={t('contextMenu.open')}
+            label={t("contextMenu.open")}
             onClick={() => onClose()}
           />
           <ContextMenuSeparator />
           <ContextMenuItem
             icon={<Pencil className="h-4 w-4" />}
-            label={t('contextMenu.rename')}
+            label={t("contextMenu.rename")}
             onClick={handleRename}
           />
           <ContextMenuItem
             icon={<Copy className="h-4 w-4" />}
-            label={t('contextMenu.copyPath')}
+            label={t("contextMenu.copyPath")}
             onClick={handleCopyPath}
           />
           <ContextMenuSeparator />
           <ContextMenuItem
             icon={<Trash2 className="h-4 w-4" />}
-            label={t('contextMenu.delete')}
+            label={t("contextMenu.delete")}
             onClick={handleDelete}
             destructive
           />
         </>
       )}
     </div>
-  )
+  );
 }
 
 interface ContextMenuItemProps {
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-  destructive?: boolean
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  destructive?: boolean;
 }
 
 function ContextMenuItem({ icon, label, onClick, destructive }: ContextMenuItemProps) {
@@ -208,30 +199,30 @@ function ContextMenuItem({ icon, label, onClick, destructive }: ContextMenuItemP
     <button
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm',
-        'hover:bg-accent hover:text-accent-foreground',
-        'focus:bg-accent focus:text-accent-foreground focus:outline-none',
-        destructive && 'text-destructive hover:bg-destructive/10 hover:text-destructive'
+        "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+        "hover:bg-accent hover:text-accent-foreground",
+        "focus:bg-accent focus:text-accent-foreground focus:outline-none",
+        destructive && "text-destructive hover:bg-destructive/10 hover:text-destructive"
       )}
     >
       {icon}
       <span>{label}</span>
     </button>
-  )
+  );
 }
 
 function ContextMenuSeparator() {
-  return <div className="my-1 h-px bg-muted" />
+  return <div className="my-1 h-px bg-muted" />;
 }
 
 // Empty space context menu (for creating in current directory)
 interface EmptySpaceContextMenuProps {
-  position: ContextMenuPosition
-  currentPath: string
-  onClose: () => void
-  onCreateFile: (parentPath: string) => void
-  onCreateDirectory: (parentPath: string) => void
-  onRefresh?: (path: string) => void
+  position: ContextMenuPosition;
+  currentPath: string;
+  onClose: () => void;
+  onCreateFile: (parentPath: string) => void;
+  onCreateDirectory: (parentPath: string) => void;
+  onRefresh?: (path: string) => void;
 }
 
 export function EmptySpaceContextMenu({
@@ -240,59 +231,59 @@ export function EmptySpaceContextMenu({
   onClose,
   onCreateFile,
   onCreateDirectory,
-  onRefresh
+  onRefresh,
 }: EmptySpaceContextMenuProps) {
-  const { t } = useTranslation('filebrowser')
-  const menuRef = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation("filebrowser");
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose()
+        onClose();
       }
-    }
+    };
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
+      if (e.key === "Escape") {
+        onClose();
       }
-    }
+    };
 
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [onClose])
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [onClose]);
 
   return (
     <div
       ref={menuRef}
       className={cn(
-        'fixed z-50 min-w-[160px] rounded-md border bg-popover p-1 shadow-md',
-        'animate-in fade-in-0 zoom-in-95'
+        "fixed z-50 min-w-[160px] rounded-md border bg-popover p-1 shadow-md",
+        "animate-in fade-in-0 zoom-in-95"
       )}
       style={{
         left: position.x,
-        top: position.y
+        top: position.y,
       }}
     >
       <ContextMenuItem
         icon={<FilePlus className="h-4 w-4" />}
-        label={t('contextMenu.newFile')}
+        label={t("contextMenu.newFile")}
         onClick={() => {
-          onCreateFile(currentPath)
-          onClose()
+          onCreateFile(currentPath);
+          onClose();
         }}
       />
       <ContextMenuItem
         icon={<FolderPlus className="h-4 w-4" />}
-        label={t('contextMenu.newFolder')}
+        label={t("contextMenu.newFolder")}
         onClick={() => {
-          onCreateDirectory(currentPath)
-          onClose()
+          onCreateDirectory(currentPath);
+          onClose();
         }}
       />
       {onRefresh && (
@@ -300,14 +291,14 @@ export function EmptySpaceContextMenu({
           <ContextMenuSeparator />
           <ContextMenuItem
             icon={<RefreshCw className="h-4 w-4" />}
-            label={t('contextMenu.refresh')}
+            label={t("contextMenu.refresh")}
             onClick={() => {
-              onRefresh(currentPath)
-              onClose()
+              onRefresh(currentPath);
+              onClose();
             }}
           />
         </>
       )}
     </div>
-  )
+  );
 }

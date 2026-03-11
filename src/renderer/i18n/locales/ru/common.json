@@ -39,5 +39,17 @@
   },
   "time": {
     "lastActivity": "Последняя активность"
+  },
+  "toasts": {
+    "failedToLoadSettings": "Не удалось загрузить настройки Claude",
+    "failedToSaveSettings": "Не удалось сохранить настройки",
+    "failedToLoadSessions": "Не удалось загрузить сессии",
+    "failedToLoadAgents": "Не удалось загрузить агенты",
+    "failedToCreateSession": "Не удалось создать сессию",
+    "failedToDeleteSession": "Не удалось удалить сессию",
+    "failedToStartAgent": "Не удалось запустить агента",
+    "failedToKillAgent": "Не удалось остановить агента",
+    "failedToExportLogs": "Не удалось экспортировать логи",
+    "settingsSaved": "Настройки успешно сохранены"
   }
 }
