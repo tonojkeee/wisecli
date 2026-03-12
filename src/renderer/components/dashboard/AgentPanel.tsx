@@ -9,9 +9,16 @@ interface AgentPanelProps {
   isActive: boolean;
   onSelect: () => void;
   onKill: () => void;
+  compactMode?: boolean;
 }
 
-export function AgentPanel({ agent, isActive, onSelect, onKill }: AgentPanelProps) {
+export function AgentPanel({
+  agent,
+  isActive,
+  onSelect,
+  onKill,
+  compactMode = false,
+}: AgentPanelProps) {
   const { t } = useTranslation("agents");
 
   const statusConfig = {
@@ -60,6 +67,56 @@ export function AgentPanel({ agent, isActive, onSelect, onKill }: AgentPanelProp
     const parts = path.split("/");
     return parts[parts.length - 1] || path;
   };
+
+  // Compact mode - show minimal info
+  if (compactMode) {
+    return (
+      <div
+        onClick={onSelect}
+        onMouseDown={(e) => e.preventDefault()}
+        className={cn(
+          "group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-border/50 bg-card/30 transition-all duration-200",
+          "hover:bg-card/50 hover:shadow-md hover:border-primary/30",
+          "focus:outline-none focus:ring-1 focus:ring-primary/50",
+          isActive && "border-primary/50 bg-card/60 shadow-md ring-1 ring-primary/20"
+        )}
+        title={`${agent.id.slice(0, 8)} - ${config.label}`}
+      >
+        <Terminal className={cn("h-4 w-4", isActive ? "text-primary" : "text-muted-foreground")} />
+        {/* Status indicator */}
+        <div
+          className={cn(
+            "absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-background",
+            config.color,
+            config.pulse && "animate-pulse"
+          )}
+        />
+        {/* Kill button on hover */}
+        {agent.status !== "exited" && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onKill();
+            }}
+            className={cn(
+              "absolute -right-1 -bottom-1 rounded bg-destructive/80 p-0.5 opacity-0 transition-opacity",
+              "group-hover:opacity-100"
+            )}
+          >
+            <svg
+              className="h-2.5 w-2.5 text-destructive-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <rect x="6" y="6" width="12" height="12" rx="1" />
+            </svg>
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -170,12 +227,26 @@ interface AgentGridProps {
   activeAgentId: string | null;
   onSelectAgent: (agentId: string) => void;
   onKillAgent: (agentId: string) => void;
+  compactMode?: boolean;
 }
 
-export function AgentGrid({ agents, activeAgentId, onSelectAgent, onKillAgent }: AgentGridProps) {
+export function AgentGrid({
+  agents,
+  activeAgentId,
+  onSelectAgent,
+  onKillAgent,
+  compactMode = false,
+}: AgentGridProps) {
   const { t } = useTranslation("agents");
 
   if (agents.length === 0) {
+    if (compactMode) {
+      return (
+        <div className="flex flex-col items-center justify-center py-4">
+          <Sparkles className="h-4 w-4 text-muted-foreground/40" />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 bg-muted/5 py-8">
         <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-muted/30">
@@ -196,6 +267,7 @@ export function AgentGrid({ agents, activeAgentId, onSelectAgent, onKillAgent }:
           isActive={agent.id === activeAgentId}
           onSelect={() => onSelectAgent(agent.id)}
           onKill={() => onKillAgent(agent.id)}
+          compactMode={compactMode}
         />
       ))}
     </div>

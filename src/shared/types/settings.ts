@@ -12,6 +12,8 @@ export interface AppearanceSettings {
   fontSize: number;
   fontFamily: string;
   language: "en" | "ru";
+  sidebarWidth: number;
+  sidebarCollapsed: boolean;
 }
 
 export interface TerminalSettings {

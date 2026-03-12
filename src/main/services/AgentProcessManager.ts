@@ -202,6 +202,7 @@ class AgentProcessManager extends EventEmitter {
   }
 
   private handleAgentOutput(agentId: string, data: string): void {
+    console.log("[MAIN] handleAgentOutput:", agentId.slice(0, 8), data.length, "bytes");
     const agent = this.agents.get(agentId);
     if (!agent) return;
 
@@ -295,6 +296,12 @@ class AgentProcessManager extends EventEmitter {
     const combinedData = batch.map((b) => b.data).join("");
     const latestTimestamp = batch[batch.length - 1].timestamp;
 
+    console.log(
+      "[MAIN] flushOutputBatch sending to renderer:",
+      agentId.slice(0, 8),
+      combinedData.length,
+      "bytes"
+    );
     // Send to renderer
     this.sendToRenderer("agent:output", {
       agentId,

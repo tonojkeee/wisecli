@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { FileTreeItem, RenameInput, NewEntryInput } from "./FileTreeItem";
@@ -17,14 +17,75 @@ import {
 
 interface FileTreeProps {
   className?: string;
+  searchQuery?: string;
   onCreateFile?: (parentPath: string, name: string) => Promise<void>;
   onCreateDirectory?: (parentPath: string, name: string) => Promise<void>;
   onRename?: (oldPath: string, newName: string) => Promise<void>;
   onDelete?: (path: string) => Promise<void>;
 }
 
+// Helper function to check if an entry matches the search query
+function entryMatchesQuery(entry: DirectoryEntry, query: string): boolean {
+  const lowerQuery = query.toLowerCase();
+  if (entry.name.toLowerCase().includes(lowerQuery)) {
+    return true;
+  }
+  return false;
+}
+
+// Helper function to recursively search entries and find matching paths
+function findMatchingEntries(
+  entries: DirectoryEntry[],
+  query: string,
+  directoryCache: Map<string, DirectoryEntry[]>
+): Set<string> {
+  const matchingPaths = new Set<string>();
+
+  function searchInEntries(entriesToSearch: DirectoryEntry[]): void {
+    for (const entry of entriesToSearch) {
+      if (entryMatchesQuery(entry, query)) {
+        matchingPaths.add(entry.path);
+        // If it's a directory, also add all children to show the full path
+        if (entry.isDirectory) {
+          const childEntries = directoryCache.get(entry.path) || [];
+          addAllChildren(childEntries, matchingPaths, directoryCache);
+        }
+      }
+      if (entry.isDirectory) {
+        const childEntries = directoryCache.get(entry.path) || [];
+        searchInEntries(childEntries);
+        // If any child matches, also add this directory
+        for (const child of childEntries) {
+          if (matchingPaths.has(child.path)) {
+            matchingPaths.add(entry.path);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  function addAllChildren(
+    entries: DirectoryEntry[],
+    set: Set<string>,
+    cache: Map<string, DirectoryEntry[]>
+  ): void {
+    for (const entry of entries) {
+      set.add(entry.path);
+      if (entry.isDirectory) {
+        const children = cache.get(entry.path) || [];
+        addAllChildren(children, set, cache);
+      }
+    }
+  }
+
+  searchInEntries(entries);
+  return matchingPaths;
+}
+
 export function FileTree({
   className,
+  searchQuery = "",
   onCreateFile,
   onCreateDirectory,
   onRename,
@@ -43,6 +104,7 @@ export function FileTree({
   const openFile = useFileStore((state) => state.openFile);
   const loadDirectory = useFileStore((state) => state.loadDirectory);
   const isLoadingDirectory = useFileStore((state) => state.isLoadingDirectory);
+  const directoryCache = useFileStore((state) => state.directoryCache);
 
   // Local state
   const [contextMenu, setContextMenu] = useState<{
@@ -60,6 +122,49 @@ export function FileTree({
     parentPath: string;
     type: "file" | "folder";
   } | null>(null);
+
+  // Get root entries
+  const rootEntries = useDirectoryEntries(projectPath || "");
+
+  // Find matching entries when searching
+  const matchingPaths = useMemo(() => {
+    if (!searchQuery.trim() || !projectPath) {
+      return null;
+    }
+    return findMatchingEntries(rootEntries, searchQuery, directoryCache);
+  }, [searchQuery, rootEntries, directoryCache, projectPath]);
+
+  // Auto-expand folders containing matches
+  useEffect(() => {
+    if (matchingPaths && matchingPaths.size > 0) {
+      // Expand all parent folders of matching entries
+      matchingPaths.forEach((path) => {
+        if (!expandedFolders.has(path)) {
+          const entry = findEntryByPath(rootEntries, path, directoryCache);
+          if (entry?.isDirectory) {
+            toggleFolder(path);
+          }
+        }
+      });
+    }
+  }, [matchingPaths]);
+
+  // Helper to find entry by path
+  function findEntryByPath(
+    entries: DirectoryEntry[],
+    targetPath: string,
+    cache: Map<string, DirectoryEntry[]>
+  ): DirectoryEntry | null {
+    for (const entry of entries) {
+      if (entry.path === targetPath) return entry;
+      if (entry.isDirectory) {
+        const children = cache.get(entry.path) || [];
+        const found = findEntryByPath(children, targetPath, cache);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
 
   // Handle context menu
   const handleContextMenu = useCallback((e: React.MouseEvent, entry: DirectoryEntry) => {
@@ -176,6 +281,11 @@ export function FileTree({
       const entries = useFileStore.getState().directoryCache.get(dirPath) || [];
       const isLoading = isLoadingDirectory;
 
+      // Filter entries based on search
+      const filteredEntries = matchingPaths
+        ? entries.filter((entry) => matchingPaths.has(entry.path))
+        : entries;
+
       if (entries.length === 0 && depth === 0 && isLoading) {
         return (
           <div className="flex items-center justify-center py-8">
@@ -184,7 +294,15 @@ export function FileTree({
         );
       }
 
-      if (entries.length === 0 && depth === 0) {
+      if (filteredEntries.length === 0 && depth === 0) {
+        if (searchQuery.trim()) {
+          return (
+            <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+              <Search className="mb-2 h-5 w-5 opacity-50" />
+              <p className="text-sm">{t("search.noResults")}</p>
+            </div>
+          );
+        }
         return (
           <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
             <p className="text-sm">{t("emptyFolder")}</p>
@@ -192,10 +310,11 @@ export function FileTree({
         );
       }
 
-      return entries.map((entry) => {
+      return filteredEntries.map((entry) => {
         const isExpanded = expandedFolders.has(entry.path);
         const isSelected = selectedPath === entry.path;
         const isRenaming = renamingPath === entry.path;
+        const isMatch = searchQuery.trim() && entryMatchesQuery(entry, searchQuery);
 
         // Check if this entry has a new entry input following it
         const showNewEntryAfter = newEntry?.parentPath === entry.path && entry.isDirectory;
@@ -226,6 +345,7 @@ export function FileTree({
               onSelect={selectPath}
               onOpenFile={openFile}
               onContextMenu={handleContextMenu}
+              highlight={!!isMatch}
             >
               {entry.isDirectory && isExpanded && renderTree(entry.path, depth + 1)}
             </FileTreeItem>
@@ -249,6 +369,8 @@ export function FileTree({
       renamingPath,
       newEntry,
       isLoadingDirectory,
+      matchingPaths,
+      searchQuery,
       toggleFolder,
       selectPath,
       openFile,
@@ -264,7 +386,11 @@ export function FileTree({
 
   // New entry at root level
   const showNewEntryAtRoot = newEntry?.parentPath === projectPath;
-  const rootEntries = useDirectoryEntries(projectPath || "");
+
+  // Filter root entries based on search
+  const filteredRootEntries = matchingPaths
+    ? rootEntries.filter((entry) => matchingPaths.has(entry.path))
+    : rootEntries;
 
   if (!projectPath) {
     return (
@@ -283,52 +409,61 @@ export function FileTree({
     <div className={cn("relative", className)} onContextMenu={handleEmptyContextMenu}>
       <ScrollArea className="h-full">
         <div className="py-1" role="tree" aria-label={t("fileTree")}>
-          {rootEntries.map((entry) => {
-            const isExpanded = expandedFolders.has(entry.path);
-            const isSelected = selectedPath === entry.path;
-            const isRenaming = renamingPath === entry.path;
+          {filteredRootEntries.length === 0 && searchQuery.trim() ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+              <Search className="mb-2 h-5 w-5 opacity-50" />
+              <p className="text-sm">{t("search.noResults")}</p>
+            </div>
+          ) : (
+            filteredRootEntries.map((entry) => {
+              const isExpanded = expandedFolders.has(entry.path);
+              const isSelected = selectedPath === entry.path;
+              const isRenaming = renamingPath === entry.path;
+              const isMatch = searchQuery.trim() && entryMatchesQuery(entry, searchQuery);
 
-            const showNewEntryAfter = newEntry?.parentPath === entry.path && entry.isDirectory;
+              const showNewEntryAfter = newEntry?.parentPath === entry.path && entry.isDirectory;
 
-            if (isRenaming) {
-              return (
-                <RenameInput
-                  key={entry.path}
-                  initialName={entry.name}
-                  onRename={handleRename}
-                  onCancel={cancelRename}
-                  depth={0}
-                />
-              );
-            }
-
-            return (
-              <React.Fragment key={entry.path}>
-                <FileTreeItem
-                  entry={entry}
-                  depth={0}
-                  isExpanded={isExpanded}
-                  isSelected={isSelected}
-                  gitStatus={getFileGitStatus(entry.path)}
-                  onToggle={toggleFolder}
-                  onSelect={selectPath}
-                  onOpenFile={openFile}
-                  onContextMenu={handleContextMenu}
-                >
-                  {entry.isDirectory && isExpanded && renderTree(entry.path, 1)}
-                </FileTreeItem>
-
-                {showNewEntryAfter && (
-                  <NewEntryInput
-                    type={newEntry.type}
-                    depth={1}
-                    onCreate={newEntry.type === "file" ? handleCreateFile : handleCreateDirectory}
-                    onCancel={cancelNewEntry}
+              if (isRenaming) {
+                return (
+                  <RenameInput
+                    key={entry.path}
+                    initialName={entry.name}
+                    onRename={handleRename}
+                    onCancel={cancelRename}
+                    depth={0}
                   />
-                )}
-              </React.Fragment>
-            );
-          })}
+                );
+              }
+
+              return (
+                <React.Fragment key={entry.path}>
+                  <FileTreeItem
+                    entry={entry}
+                    depth={0}
+                    isExpanded={isExpanded}
+                    isSelected={isSelected}
+                    gitStatus={getFileGitStatus(entry.path)}
+                    onToggle={toggleFolder}
+                    onSelect={selectPath}
+                    onOpenFile={openFile}
+                    onContextMenu={handleContextMenu}
+                    highlight={!!isMatch}
+                  >
+                    {entry.isDirectory && isExpanded && renderTree(entry.path, 1)}
+                  </FileTreeItem>
+
+                  {showNewEntryAfter && (
+                    <NewEntryInput
+                      type={newEntry.type}
+                      depth={1}
+                      onCreate={newEntry.type === "file" ? handleCreateFile : handleCreateDirectory}
+                      onCancel={cancelNewEntry}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })
+          )}
 
           {/* New entry at root level */}
           {showNewEntryAtRoot && (

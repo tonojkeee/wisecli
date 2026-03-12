@@ -36,6 +36,8 @@ const defaultAppearanceSettings: AppearanceSettings = {
   fontSize: 14,
   fontFamily: "JetBrains Mono, Menlo, Monaco, Courier New, monospace",
   language: "en",
+  sidebarWidth: 320,
+  sidebarCollapsed: false,
 };
 
 const defaultTerminalSettings: TerminalSettings = {

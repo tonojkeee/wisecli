@@ -77,6 +77,7 @@ export function TerminalView({
   const onResizeRef = useRef(onResize);
   const outputBufferRef = useRef(outputBuffer);
   const copyOnSelectRef = useRef(copyOnSelect);
+  const outputVersionRef = useRef(outputVersion);
 
   useEffect(() => {
     onInputRef.current = onInput;
@@ -89,6 +90,10 @@ export function TerminalView({
   useEffect(() => {
     outputBufferRef.current = outputBuffer;
   }, [outputBuffer]);
+
+  useEffect(() => {
+    outputVersionRef.current = outputVersion;
+  }, [outputVersion]);
 
   useEffect(() => {
     copyOnSelectRef.current = copyOnSelect;
@@ -263,11 +268,21 @@ export function TerminalView({
   }, [containerReady]);
 
   // Handle agent switching and output buffer updates
+  // Only depend on agentId and outputVersion - use refs for buffer access
+  // to prevent unnecessary re-runs when buffer reference changes
   useEffect(() => {
     const terminal = xtermRef.current;
     if (!terminal || isDisposedRef.current) return;
 
     const isAgentSwitch = currentAgentIdRef.current !== agentId;
+
+    console.log("[TERMINAL] useEffect triggered:", {
+      agentId: agentId.slice(0, 8),
+      isAgentSwitch,
+      outputVersion,
+      lastVersion: lastOutputVersionRef.current,
+      bufferLength: outputBufferRef.current.length,
+    });
 
     // Handle agent switch
     if (isAgentSwitch) {
@@ -281,10 +296,23 @@ export function TerminalView({
     if (outputVersion > lastOutputVersionRef.current) {
       // Calculate how many new items were added since last render
       const itemsAdded = outputVersion - lastOutputVersionRef.current;
+      // Use ref to get buffer to avoid dependency on buffer reference
+      const buffer = outputBufferRef.current;
       // Get only the newest items (they're at the end of the buffer array)
-      const startIndex = Math.max(0, outputBuffer.length - itemsAdded);
-      const newData = outputBuffer.slice(startIndex);
+      const startIndex = Math.max(0, buffer.length - itemsAdded);
+      const newData = buffer.slice(startIndex);
       const combinedData = newData.join("");
+
+      console.log(
+        "[TERMINAL] write:",
+        agentId.slice(0, 8),
+        "version:",
+        outputVersion,
+        "itemsAdded:",
+        itemsAdded,
+        "dataLen:",
+        combinedData.length
+      );
 
       if (combinedData && !isDisposedRef.current) {
         try {
@@ -330,7 +358,7 @@ export function TerminalView({
         safeFit();
       });
     }
-  }, [agentId, outputBuffer, outputVersion, safeFit]);
+  }, [agentId, outputVersion, safeFit]);
 
   // Update terminal settings
   useEffect(() => {

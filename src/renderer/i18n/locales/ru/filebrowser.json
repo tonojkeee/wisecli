@@ -6,6 +6,11 @@
   "emptyFolder": "Папка пуста",
   "refresh": "Обновить",
   "fileTree": "Дерево файлов",
+  "search": {
+    "placeholder": "Поиск файлов...",
+    "noResults": "Файлы не найдены",
+    "clear": "Очистить поиск"
+  },
 
   "contextMenu": {
     "newFile": "Новый файл",

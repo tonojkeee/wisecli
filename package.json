@@ -20,6 +20,7 @@
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@monaco-editor/react": "^4.7.0",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@xterm/addon-clipboard": "^0.2.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-search": "^0.15.0",

@@ -8,6 +8,11 @@ import { useTodoStore } from "@renderer/stores/useTodoStore";
 import { useStatuslineStore } from "@renderer/stores/useStatuslineStore";
 import { useClaudeCodeStore } from "@renderer/stores/useClaudeCodeStore";
 
+// Module-level guard to prevent multiple IPC subscriptions
+// This persists across React component re-mounts and HMR
+let ipcSubscriptionsActive = false;
+let unsubscribeCallbacks: (() => void)[] = [];
+
 /**
  * Handles initial app setup: loading settings, sessions, agents,
  * and subscribing to IPC events
@@ -70,8 +75,24 @@ export function useAppInitialization() {
   }, [tCommon]);
 
   // Subscribe to agent events - use getState() for stable subscription
+  // Guard at module level to prevent multiple subscriptions across React lifecycle
   useEffect(() => {
+    // Check if already subscribed at module level
+    if (ipcSubscriptionsActive) {
+      console.log("[INIT] IPC subscriptions already active, skipping");
+      return;
+    }
+
+    console.log("[INIT] Setting up IPC subscriptions");
+    ipcSubscriptionsActive = true;
+
     const unsubOutput = window.electronAPI.agent.onOutput((event) => {
+      console.log(
+        "[RENDERER] onOutput received:",
+        event.agentId.slice(0, 8),
+        event.data.length,
+        "bytes"
+      );
       // Use getState() to avoid closure dependency
       appendOutput(event.agentId, event.data);
     });
@@ -107,14 +128,22 @@ export function useAppInitialization() {
       useClaudeCodeStore.getState().setPendingOpenFile(payload);
     });
 
+    // Store unsubscribe callbacks for cleanup
+    unsubscribeCallbacks = [
+      unsubOutput,
+      unsubStatus,
+      unsubExited,
+      unsubTodos,
+      unsubStatusline,
+      unsubClaudeStatus,
+      unsubClaudeOpenFile,
+    ];
+
     return () => {
-      unsubOutput();
-      unsubStatus();
-      unsubExited();
-      unsubTodos();
-      unsubStatusline();
-      unsubClaudeStatus();
-      unsubClaudeOpenFile();
+      console.log("[INIT] Cleaning up IPC subscriptions");
+      unsubscribeCallbacks.forEach((unsub) => unsub());
+      unsubscribeCallbacks = [];
+      ipcSubscriptionsActive = false;
     };
   }, []); // Empty deps - subscription created once
 }

@@ -6,6 +6,11 @@
   "emptyFolder": "Empty folder",
   "refresh": "Refresh",
   "fileTree": "File tree",
+  "search": {
+    "placeholder": "Search files...",
+    "noResults": "No files found",
+    "clear": "Clear search"
+  },
 
   "contextMenu": {
     "newFile": "New File",

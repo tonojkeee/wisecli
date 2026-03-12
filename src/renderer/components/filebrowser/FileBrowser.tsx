@@ -1,8 +1,9 @@
-import React, { useEffect, useCallback, useRef } from "react";
+import React, { useEffect, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw, FolderOpen, GitBranch } from "lucide-react";
+import { RefreshCw, FolderOpen, GitBranch, Search, X } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
+import { Input } from "@renderer/components/ui/input";
 import { FileTree } from "./FileTree";
 import { useFileStore } from "@renderer/stores/useFileStore";
 
@@ -32,8 +33,30 @@ export function FileBrowser({ projectPath, className }: FileBrowserProps) {
   const stopGitWatching = useFileStore((state) => state.stopGitWatching);
   const setGitStatus = useFileStore((state) => state.setGitStatus);
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Track git subscription for cleanup
   const gitUnsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Debounce search query
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchQuery]);
 
   // Update project path when prop changes
   useEffect(() => {
@@ -113,6 +136,13 @@ export function FileBrowser({ projectPath, className }: FileBrowserProps) {
     [renameEntry]
   );
 
+  // Clear search
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedQuery("");
+    searchInputRef.current?.focus();
+  }, []);
+
   // Get display path (show last 2 directories)
   const getDisplayPath = (path: string) => {
     const parts = path.split("/");
@@ -161,6 +191,32 @@ export function FileBrowser({ projectPath, className }: FileBrowserProps) {
         </Button>
       </div>
 
+      {/* Search bar */}
+      {currentProjectPath && (
+        <div className="border-b px-3 py-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder={t("search.placeholder")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-7 pl-7 pr-7 text-xs"
+            />
+            {searchQuery && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                title={t("search.clear")}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Error display */}
       {error && (
         <div className="mx-3 mt-2 rounded-md bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
@@ -181,6 +237,7 @@ export function FileBrowser({ projectPath, className }: FileBrowserProps) {
         {currentProjectPath ? (
           <FileTree
             className="h-full"
+            searchQuery={debouncedQuery}
             onCreateFile={handleCreateFile}
             onCreateDirectory={handleCreateDirectory}
             onRename={handleRename}

@@ -28,6 +28,7 @@ interface FileTreeItemProps {
   onSelect: (path: string) => void;
   onOpenFile: (path: string) => void;
   onContextMenu: (e: React.MouseEvent, entry: DirectoryEntry) => void;
+  highlight?: boolean;
   children?: React.ReactNode;
 }
 
@@ -90,6 +91,7 @@ export function FileTreeItem({
   onSelect,
   onOpenFile,
   onContextMenu,
+  highlight,
   children,
 }: FileTreeItemProps) {
   const handleClick = (e: React.MouseEvent) => {
@@ -128,7 +130,8 @@ export function FileTreeItem({
         className={cn(
           "group flex cursor-pointer items-center gap-1 py-0.5 pr-2 text-sm",
           "hover:bg-accent/50 focus:bg-accent/50 focus:outline-none",
-          isSelected && "bg-accent text-accent-foreground"
+          isSelected && "bg-accent text-accent-foreground",
+          highlight && "bg-primary/10 text-primary"
         )}
         style={{ paddingLeft }}
       >
