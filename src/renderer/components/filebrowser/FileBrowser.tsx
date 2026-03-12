@@ -26,6 +26,7 @@ export function FileBrowser({ projectPath, className }: FileBrowserProps) {
   const clearError = useFileStore((state) => state.clearError);
 
   // Git state and actions
+  const gitStatus = useFileStore((state) => state.gitStatus);
   const loadGitStatus = useFileStore((state) => state.loadGitStatus);
   const startGitWatching = useFileStore((state) => state.startGitWatching);
   const stopGitWatching = useFileStore((state) => state.stopGitWatching);

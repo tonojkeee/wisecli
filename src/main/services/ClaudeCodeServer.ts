@@ -16,6 +16,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { debug } from "../utils/debug.js";
 import type {
   ClaudeCodeStatus,
   SelectionChangedPayload,
@@ -132,7 +133,7 @@ class ClaudeCodeServer {
     // Start listening
     await new Promise<void>((resolve, reject) => {
       this.httpServer!.listen(this.port, () => {
-        console.log(`[ClaudeCodeServer] Listening on port ${this.port}`);
+        debug.log(`[ClaudeCodeServer] Listening on port ${this.port}`);
         resolve();
       });
       this.httpServer!.on("error", reject);
@@ -158,7 +159,7 @@ class ClaudeCodeServer {
     process.env.CLAUDE_CODE_SSE_PORT = this.port.toString();
     process.env.ENABLE_IDE_INTEGRATION = "true";
 
-    console.log(`[ClaudeCodeServer] Started with lock file: ${this.lockFilePath}`);
+    debug.log(`[ClaudeCodeServer] Started with lock file: ${this.lockFilePath}`);
   }
 
   /**
@@ -201,7 +202,7 @@ class ClaudeCodeServer {
     this.isStarted = false;
     this.notifyStatus("disconnected");
 
-    console.log("[ClaudeCodeServer] Stopped");
+    debug.log("[ClaudeCodeServer] Stopped");
   }
 
   /**
@@ -281,7 +282,7 @@ class ClaudeCodeServer {
     }
 
     this.connectedClients.add(ws);
-    console.log("[ClaudeCodeServer] Client connected");
+    debug.log("[ClaudeCodeServer] Client connected");
 
     ws.on("close", () => {
       this.connectedClients.delete(ws);

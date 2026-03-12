@@ -52,6 +52,15 @@ export function useAppInitialization() {
       try {
         const loadedAgents = await window.electronAPI.agent.list();
         useAgentStore.getState().setAgents(loadedAgents);
+
+        // Set first agent as active if there's no active agent
+        const currentActiveId = useAgentStore.getState().activeAgentId;
+        if (!currentActiveId && loadedAgents.length > 0) {
+          useAgentStore.getState().setActiveAgent(loadedAgents[0].id);
+        } else if (currentActiveId) {
+          // Also notify main process about existing active agent
+          window.electronAPI.agent.setActive(currentActiveId);
+        }
       } catch (error) {
         console.error("Failed to load agents:", error);
         toast.error(tCommon("toasts.failedToLoadAgents"));
@@ -68,7 +77,6 @@ export function useAppInitialization() {
     });
 
     const unsubStatus = window.electronAPI.agent.onStatus((event) => {
-      console.log("[App] Received agent:status event:", event);
       // Use type guard to safely cast status
       const status = isValidAgentStatus(event.status) ? event.status : "idle";
       useAgentStore.getState().updateAgent(event.agentId, { status });

@@ -8,10 +8,14 @@ import { registerSettingsHandlers, setupSettingsNotifications } from "./ipc/sett
 import { registerFsHandlers } from "./ipc/fsHandlers";
 import { registerGitHandlers } from "./ipc/gitHandlers";
 import { registerClaudeCodeIpcHandlers } from "./ipc/claudeCodeHandlers";
+import { registerClipboardHandlers } from "./ipc/clipboardHandlers";
+import { registerTaskHandlers } from "./ipc/taskHandlers";
 import { appSettingsManager } from "./services/AppSettingsManager";
 import { trayManager } from "./services/TrayManager";
 import { autoLaunchManager } from "./services/AutoLaunchManager";
 import { gitService } from "./services/GitService";
+import { hookScriptsManager } from "./services/HookScripts";
+import { claudeTaskService } from "./services/ClaudeTaskService";
 
 // Error handling for main process
 process.on("uncaughtException", (error) => {
@@ -36,6 +40,8 @@ registerSettingsHandlers();
 registerFsHandlers();
 registerGitHandlers();
 registerClaudeCodeIpcHandlers();
+registerClipboardHandlers();
+registerTaskHandlers();
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -71,6 +77,9 @@ function createWindow(): void {
 
   // Set main window for git service
   gitService.setMainWindow(mainWindow);
+
+  // Set main window for task service
+  claudeTaskService.setMainWindow(mainWindow);
 
   // Set up settings change notifications
   setupSettingsNotifications(mainWindow);
@@ -198,6 +207,11 @@ app.whenReady().then(() => {
   trayManager.setMainWindow(mainWindow!);
   trayManager.create();
 
+  // Install hook scripts for statusline integration
+  hookScriptsManager.ensureInstalled().catch((err) => {
+    console.error("[Main] Failed to install hook scripts:", err);
+  });
+
   // Start Claude Code IDE integration server
   // Will be started when first agent is created with workspace folder
   // syncAutoLaunchSetting()
@@ -230,6 +244,7 @@ app.on("before-quit", () => {
   unregisterGlobalShortcuts();
   agentProcessManager.cleanup();
   gitService.stopAllWatching();
+  claudeTaskService.stopAllWatching();
   trayManager.destroy();
 });
 

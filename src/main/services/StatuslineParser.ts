@@ -57,6 +57,8 @@ export function parseStatuslineInput(input: StatuslineInput): DisplayStatusline 
     model: input.model?.display_name ?? "unknown",
     contextUsagePercent: input.context_window?.used_percentage ?? null,
     contextRemainingPercent: input.context_window?.remaining_percentage ?? null,
+    contextUsedTokens: input.context_window?.total_input_tokens ?? null,
+    contextWindowSize: input.context_window?.context_window_size ?? null,
     costUsd: input.cost?.total_cost_usd ?? 0,
     cwd: input.cwd ?? "",
     sessionId: input.session_id ?? "",
@@ -83,6 +85,8 @@ export class StatuslineParser {
         model: parsed.model,
         contextUsagePercent: parsed.contextUsagePercent,
         contextRemainingPercent: null, // Not available from OSC sequence
+        contextUsedTokens: null, // Not available from OSC sequence
+        contextWindowSize: null, // Not available from OSC sequence
         costUsd: parsed.cost,
         cwd: "",
         sessionId: "",

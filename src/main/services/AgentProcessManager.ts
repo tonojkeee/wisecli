@@ -9,9 +9,37 @@ import { claudeCodeServer } from "./ClaudeCodeServer.js";
 import { claudeHooksServer } from "./ClaudeHooksServer.js";
 import { hookScriptsManager } from "./HookScripts.js";
 import { RingBuffer } from "@shared/utils/RingBuffer";
+import { debug } from "../utils/debug.js";
 
 const require = createRequire(import.meta.url);
 const pty = require("node-pty") as typeof Pty;
+
+// Dangerous environment variables that should never be passed from user input
+const DANGEROUS_ENV_VARS = [
+  "LD_PRELOAD",
+  "LD_LIBRARY_PATH",
+  "DYLD_INSERT_LIBRARIES",
+  "DYLD_LIBRARY_PATH",
+  "NODE_OPTIONS",
+  "ELECTRON_RUN_AS_NODE",
+  "ELECTRON_ENABLE_LOGGING",
+];
+
+/**
+ * Sanitize environment variables to prevent injection of dangerous values
+ */
+function sanitizeEnv(env: Record<string, string> | undefined): Record<string, string> {
+  if (!env) return {};
+  const sanitized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (DANGEROUS_ENV_VARS.includes(key)) {
+      debug.warn(`[AgentProcessManager] Blocking dangerous env var: ${key}`);
+      continue;
+    }
+    sanitized[key] = value;
+  }
+  return sanitized;
+}
 
 export interface Agent {
   id: string;
@@ -58,10 +86,21 @@ class AgentProcessManager extends EventEmitter {
     this.outputBuffers.set(agentId, new RingBuffer<string>(this.MAX_BUFFER_SIZE));
 
     // Ensure hooks server is started for status line updates
+    // Each step has its own try-catch to allow partial functionality
     if (!claudeHooksServer.isStarted()) {
-      await claudeHooksServer.start();
-      // Install hook scripts
-      await hookScriptsManager.ensureInstalled();
+      try {
+        await claudeHooksServer.start();
+      } catch (err) {
+        debug.error("[AgentProcessManager] Hooks server start failed:", err);
+        // Continue without hooks - agent can still function
+      }
+
+      try {
+        await hookScriptsManager.ensureInstalled();
+      } catch (err) {
+        debug.error("[AgentProcessManager] Hook scripts install failed:", err);
+        // Continue without hook scripts
+      }
     }
 
     // Set current agent for status line updates
@@ -69,7 +108,12 @@ class AgentProcessManager extends EventEmitter {
 
     // Ensure Claude Code server is started for IDE integration
     if (!claudeCodeServer.isActive()) {
-      await claudeCodeServer.start([workingDirectory]);
+      try {
+        await claudeCodeServer.start([workingDirectory]);
+      } catch (err) {
+        debug.error("[AgentProcessManager] Claude code server start failed:", err);
+        // Continue without IDE integration
+      }
     }
 
     // Get git context for the working directory
@@ -77,7 +121,7 @@ class AgentProcessManager extends EventEmitter {
     try {
       gitContext = await gitService.getChangedFilesContext(workingDirectory);
     } catch (error) {
-      console.debug("[AgentProcessManager] Failed to get git context:", error);
+      debug.debug("[AgentProcessManager] Failed to get git context:", error);
     }
 
     // Build environment with IDE integration
@@ -91,6 +135,7 @@ class AgentProcessManager extends EventEmitter {
     }
 
     // Create PTY process with git context and IDE integration in environment
+    // Sanitize user-provided env vars to prevent injection of dangerous values
     const ptyProcess = pty.spawn("claude", [], {
       name: "xterm-256color",
       cols: 80,
@@ -103,7 +148,8 @@ class AgentProcessManager extends EventEmitter {
         ...(gitContext ? { GIT_CHANGED_FILES_CONTEXT: gitContext } : {}),
         // Add IDE integration env vars
         ...ideEnv,
-        ...env,
+        // Sanitize user-provided env vars to prevent injection
+        ...sanitizeEnv(env),
       },
     });
 
@@ -132,7 +178,7 @@ class AgentProcessManager extends EventEmitter {
     // Set status to running after brief delay (track timeout for cleanup)
     const statusTimeout = setTimeout(() => {
       const currentAgent = this.agents.get(agentId);
-      console.log(
+      debug.log(
         "[AgentProcessManager] Timeout fired for agent:",
         agentId,
         "status:",
@@ -141,7 +187,7 @@ class AgentProcessManager extends EventEmitter {
       if (currentAgent && currentAgent.status === "starting") {
         currentAgent.status = "running";
         this.emit("agent:status", { agentId, status: "running" });
-        console.log(
+        debug.log(
           "[AgentProcessManager] Sending status to renderer, mainWindow:",
           !!this.mainWindow
         );
@@ -169,37 +215,11 @@ class AgentProcessManager extends EventEmitter {
     }
     buffer.push(data);
 
-    // Parse for statusline data (OSC escape sequences)
-    this.parseAndEmitStatusline(agentId, data);
-
     // Accumulate output for todo parsing
     this.accumulateForTodoParsing(agentId, data);
 
     // Batch output instead of immediate send to prevent IPC flooding
     this.batchOutput(agentId, data);
-  }
-
-  /**
-   * Parse output for statusline data and emit to renderer
-   */
-  private parseAndEmitStatusline(agentId: string, data: string): void {
-    if (!hasStatuslineData(data)) return;
-
-    const statusline = parseStatuslineOutput(data);
-    if (statusline) {
-      this.sendToRenderer("agent:statusline", {
-        agentId,
-        statusline: {
-          model: statusline.model,
-          contextUsagePercent: statusline.contextUsagePercent,
-          contextRemainingPercent: null,
-          costUsd: statusline.cost,
-          cwd: "",
-          sessionId: "",
-          timestamp: statusline.timestamp,
-        },
-      });
-    }
   }
 
   /**
@@ -358,6 +378,15 @@ class AgentProcessManager extends EventEmitter {
 
   getOutputBuffer(agentId: string): string[] {
     return this.outputBuffers.get(agentId)?.toArray() || [];
+  }
+
+  /**
+   * Set the active agent for statusline routing
+   * Called when user switches between agents in the UI
+   */
+  setActiveAgent(agentId: string | null): void {
+    debug.log("[AgentProcessManager] setActiveAgent called:", agentId);
+    claudeHooksServer.setCurrentAgent(agentId);
   }
 
   private sendToRenderer(channel: string, data: unknown): void {

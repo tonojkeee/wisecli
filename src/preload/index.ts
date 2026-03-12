@@ -38,6 +38,12 @@ import type {
   SelectionChangedPayload,
   AtMentionedPayload,
   OpenFilePayload,
+  // Claude Task types
+  ClaudeTask,
+  TaskStats,
+  TaskEvent,
+  TaskExportOptions,
+  TaskJsonExportOptions,
 } from "@shared/types";
 
 // Re-export types for renderer
@@ -72,6 +78,11 @@ export type {
   SelectionChangedPayload,
   AtMentionedPayload,
   OpenFilePayload,
+  ClaudeTask,
+  TaskStats,
+  TaskEvent,
+  TaskExportOptions,
+  TaskJsonExportOptions,
 };
 
 // Exposed API to renderer
@@ -107,6 +118,8 @@ const electronAPI = {
 
     getBuffer: (agentId: string): Promise<string[]> =>
       ipcRenderer.invoke("agent:get-buffer", { agentId }),
+
+    setActive: (agentId: string | null): void => ipcRenderer.send("agent:set-active", { agentId }),
 
     // Event listeners
     onOutput: (callback: (event: OutputEvent) => void) => {
@@ -376,7 +389,51 @@ const electronAPI = {
       return () => ipcRenderer.removeListener("claude-code:open-file", handler);
     },
   },
+
+  // Clipboard operations
+  clipboard: {
+    readText: (): Promise<string> => ipcRenderer.invoke("clipboard:read-text"),
+    writeText: (text: string): Promise<void> => ipcRenderer.invoke("clipboard:write-text", text),
+  },
+
+  // Claude Code Plan Mode Tasks
+  tasks: {
+    list: (sessionId?: string): Promise<ClaudeTask[]> =>
+      ipcRenderer.invoke("tasks:list", sessionId),
+
+    getStats: (sessionId?: string): Promise<TaskStats> =>
+      ipcRenderer.invoke("tasks:stats", sessionId),
+
+    startWatching: (sessionId?: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke("tasks:start-watching", sessionId),
+
+    stopWatching: (sessionId?: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("tasks:stop-watching", sessionId),
+
+    exportMarkdown: (sessionId?: string, options?: TaskExportOptions): Promise<string> =>
+      ipcRenderer.invoke("tasks:export-markdown", sessionId, options),
+
+    exportJSON: (sessionId?: string, options?: TaskJsonExportOptions): Promise<string> =>
+      ipcRenderer.invoke("tasks:export-json", sessionId, options),
+
+    onUpdated: (callback: (event: TaskEvent) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: TaskEvent) => callback(data);
+      ipcRenderer.on("tasks:updated", handler);
+      return () => ipcRenderer.removeListener("tasks:updated", handler);
+    },
+  },
 };
+
+// Type declaration for renderer
+export interface DirectoryEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  isFile: boolean;
+  extension?: string;
+  size?: number;
+  modifiedAt?: Date;
+}
 
 // Expose to renderer via contextBridge
 contextBridge.exposeInMainWorld("electronAPI", electronAPI);

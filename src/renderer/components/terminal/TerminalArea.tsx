@@ -23,6 +23,8 @@ export function TerminalArea({
 
   const cursorStyle = terminalSettings?.cursorStyle ?? "block";
   const cursorBlink = terminalSettings?.cursorBlink ?? true;
+  const copyOnSelect = terminalSettings?.copyOnSelect ?? false;
+  const rightClickPaste = terminalSettings?.rightClickPaste ?? true;
 
   if (activeAgent) {
     return (
@@ -39,6 +41,8 @@ export function TerminalArea({
             fontFamily={fontFamily}
             cursorStyle={cursorStyle}
             cursorBlink={cursorBlink}
+            copyOnSelect={copyOnSelect}
+            rightClickPaste={rightClickPaste}
           />
         </div>
 

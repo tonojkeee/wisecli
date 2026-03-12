@@ -11,11 +11,16 @@ import "./i18n";
 // This must be done before any Editor component is rendered
 loader.config({ monaco });
 
+// Note: StrictMode is disabled in development to prevent double subscriptions
+// with IPC events. In production builds, this is not an issue.
+// TODO: Fix IPC subscriptions to work properly with StrictMode
+const StrictModeWrapper = process.env.NODE_ENV === "production" ? React.StrictMode : React.Fragment;
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+  <StrictModeWrapper>
     <App />
     <Toaster richColors position="top-right" />
-  </React.StrictMode>
+  </StrictModeWrapper>
 );
 
 // HMR support

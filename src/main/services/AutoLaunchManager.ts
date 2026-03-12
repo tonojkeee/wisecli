@@ -1,104 +1,167 @@
-import { app } from 'electron'
-import { exec } from 'child_process'
-import { promisify } from 'util'
-import * as fs from 'fs'
-import * as path from 'path'
+import { app } from "electron";
+import { spawn } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 
-const execAsync = promisify(exec)
+/**
+ * Execute a command using spawn with proper argument separation
+ * This prevents command injection by avoiding shell interpretation
+ */
+function execCommand(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(command, args, { shell: false });
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`Command failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    proc.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Execute a PowerShell command safely
+ */
+function execPowerShell(psCommand: string): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    // Use -EncodedCommand for safer execution, or -Command with proper escaping
+    const proc = spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", psCommand], {
+      shell: false,
+    });
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on("close", (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`PowerShell failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    proc.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
 
 class AutoLaunchManager {
-  private appName: string
-  private appPath: string
+  private appName: string;
+  private appPath: string;
 
   constructor() {
-    this.appName = app.getName()
-    this.appPath = app.getPath('exe')
+    this.appName = app.getName();
+    this.appPath = app.getPath("exe");
   }
 
   async enable(): Promise<boolean> {
     try {
       switch (process.platform) {
-        case 'darwin':
-          return await this.enableMacOS()
-        case 'win32':
-          return await this.enableWindows()
-        case 'linux':
-          return await this.enableLinux()
+        case "darwin":
+          return await this.enableMacOS();
+        case "win32":
+          return await this.enableWindows();
+        case "linux":
+          return await this.enableLinux();
         default:
-          console.warn('Auto-launch not supported on this platform')
-          return false
+          console.warn("Auto-launch not supported on this platform");
+          return false;
       }
     } catch (error) {
-      console.error('Failed to enable auto-launch:', error)
-      return false
+      console.error("Failed to enable auto-launch:", error);
+      return false;
     }
   }
 
   async disable(): Promise<boolean> {
     try {
       switch (process.platform) {
-        case 'darwin':
-          return await this.disableMacOS()
-        case 'win32':
-          return await this.disableWindows()
-        case 'linux':
-          return await this.disableLinux()
+        case "darwin":
+          return await this.disableMacOS();
+        case "win32":
+          return await this.disableWindows();
+        case "linux":
+          return await this.disableLinux();
         default:
-          console.warn('Auto-launch not supported on this platform')
-          return false
+          console.warn("Auto-launch not supported on this platform");
+          return false;
       }
     } catch (error) {
-      console.error('Failed to disable auto-launch:', error)
-      return false
+      console.error("Failed to disable auto-launch:", error);
+      return false;
     }
   }
 
   async isEnabled(): Promise<boolean> {
     try {
       switch (process.platform) {
-        case 'darwin':
-          return await this.isEnabledMacOS()
-        case 'win32':
-          return await this.isEnabledWindows()
-        case 'linux':
-          return await this.isEnabledLinux()
+        case "darwin":
+          return await this.isEnabledMacOS();
+        case "win32":
+          return await this.isEnabledWindows();
+        case "linux":
+          return await this.isEnabledLinux();
         default:
-          return false
+          return false;
       }
     } catch (error) {
-      console.error('Failed to check auto-launch status:', error)
-      return false
+      console.error("Failed to check auto-launch status:", error);
+      return false;
     }
   }
 
   // macOS implementation using LaunchAgent
   private async enableMacOS(): Promise<boolean> {
-    const plistPath = this.getMacOSPlistPath()
-    const plistContent = this.generateMacOSPlist()
+    const plistPath = this.getMacOSPlistPath();
+    const plistContent = this.generateMacOSPlist();
 
-    await fs.promises.mkdir(path.dirname(plistPath), { recursive: true })
-    await fs.promises.writeFile(plistPath, plistContent, 'utf-8')
+    await fs.promises.mkdir(path.dirname(plistPath), { recursive: true });
+    await fs.promises.writeFile(plistPath, plistContent, "utf-8");
 
-    return true
+    return true;
   }
 
   private async disableMacOS(): Promise<boolean> {
-    const plistPath = this.getMacOSPlistPath()
+    const plistPath = this.getMacOSPlistPath();
 
     if (fs.existsSync(plistPath)) {
-      await fs.promises.unlink(plistPath)
+      await fs.promises.unlink(plistPath);
     }
 
-    return true
+    return true;
   }
 
   private async isEnabledMacOS(): Promise<boolean> {
-    const plistPath = this.getMacOSPlistPath()
-    return fs.existsSync(plistPath)
+    const plistPath = this.getMacOSPlistPath();
+    return fs.existsSync(plistPath);
   }
 
   private getMacOSPlistPath(): string {
-    return path.join(app.getPath('home'), 'Library', 'LaunchAgents', `com.${this.appName}.plist`)
+    return path.join(app.getPath("home"), "Library", "LaunchAgents", `com.${this.appName}.plist`);
   }
 
   private generateMacOSPlist(): string {
@@ -117,90 +180,113 @@ class AutoLaunchManager {
     <key>KeepAlive</key>
     <false/>
 </dict>
-</plist>`
+</plist>`;
   }
 
   // Windows implementation using Registry
   private async enableWindows(): Promise<boolean> {
-    const regKey = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
-    const appName = this.appName
+    const appName = this.appName;
 
     try {
-      await execAsync(`reg add "${regKey}" /v "${appName}" /t REG_SZ /d "${this.appPath}" /f`)
-      return true
+      // Use spawn with array arguments to prevent command injection
+      await execCommand("reg", [
+        "add",
+        "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        "/v",
+        appName,
+        "/t",
+        "REG_SZ",
+        "/d",
+        this.appPath,
+        "/f",
+      ]);
+      return true;
     } catch {
       // Fallback: try using PowerShell
       try {
-        const psCommand = `New-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -Name "${appName}" -Value "${this.appPath}" -PropertyType String -Force`
-        await execAsync(`powershell -Command "${psCommand}"`)
-        return true
+        // Escape the path for PowerShell
+        const escapedPath = this.appPath.replace(/'/g, "''");
+        const psCommand = `New-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '${appName}' -Value '${escapedPath}' -PropertyType String -Force`;
+        await execPowerShell(psCommand);
+        return true;
       } catch {
-        return false
+        return false;
       }
     }
   }
 
   private async disableWindows(): Promise<boolean> {
-    const regKey = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
-    const appName = this.appName
+    const appName = this.appName;
 
     try {
-      await execAsync(`reg delete "${regKey}" /v "${appName}" /f`)
-      return true
+      // Use spawn with array arguments to prevent command injection
+      await execCommand("reg", [
+        "delete",
+        "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        "/v",
+        appName,
+        "/f",
+      ]);
+      return true;
     } catch {
       // Key might not exist, which is fine
       try {
-        const psCommand = `Remove-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -Name "${appName}" -ErrorAction SilentlyContinue`
-        await execAsync(`powershell -Command "${psCommand}"`)
-        return true
+        const psCommand = `Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '${appName}' -ErrorAction SilentlyContinue`;
+        await execPowerShell(psCommand);
+        return true;
       } catch {
-        return false
+        return false;
       }
     }
   }
 
   private async isEnabledWindows(): Promise<boolean> {
-    const regKey = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
-    const appName = this.appName
+    const appName = this.appName;
 
     try {
-      const { stdout } = await execAsync(`reg query "${regKey}" /v "${appName}"`)
-      return stdout.includes(appName)
+      // Use spawn with array arguments to prevent command injection
+      const { stdout } = await execCommand("reg", [
+        "query",
+        "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        "/v",
+        appName,
+      ]);
+      return stdout.includes(appName);
     } catch {
-      return false
+      return false;
     }
   }
 
   // Linux implementation using desktop entry
   private async enableLinux(): Promise<boolean> {
-    const desktopPath = this.getLinuxDesktopPath()
-    const desktopContent = this.generateLinuxDesktop()
+    const desktopPath = this.getLinuxDesktopPath();
+    const desktopContent = this.generateLinuxDesktop();
 
-    const autostartDir = path.dirname(desktopPath)
-    await fs.promises.mkdir(autostartDir, { recursive: true })
-    await fs.promises.writeFile(desktopPath, desktopContent, 'utf-8')
+    const autostartDir = path.dirname(desktopPath);
+    await fs.promises.mkdir(autostartDir, { recursive: true });
+    await fs.promises.writeFile(desktopPath, desktopContent, "utf-8");
 
-    return true
+    return true;
   }
 
   private async disableLinux(): Promise<boolean> {
-    const desktopPath = this.getLinuxDesktopPath()
+    const desktopPath = this.getLinuxDesktopPath();
 
     if (fs.existsSync(desktopPath)) {
-      await fs.promises.unlink(desktopPath)
+      await fs.promises.unlink(desktopPath);
     }
 
-    return true
+    return true;
   }
 
   private async isEnabledLinux(): Promise<boolean> {
-    const desktopPath = this.getLinuxDesktopPath()
-    return fs.existsSync(desktopPath)
+    const desktopPath = this.getLinuxDesktopPath();
+    return fs.existsSync(desktopPath);
   }
 
   private getLinuxDesktopPath(): string {
-    const configHome = process.env.XDG_CONFIG_HOME || path.join(app.getPath('home'), '.config')
-    return path.join(configHome, 'autostart', `${this.appName}.desktop`)
+    const configHome = process.env.XDG_CONFIG_HOME || path.join(app.getPath("home"), ".config");
+    return path.join(configHome, "autostart", `${this.appName}.desktop`);
   }
 
   private generateLinuxDesktop(): string {
@@ -213,8 +299,8 @@ Comment=Desktop GUI for Claude CLI
 Terminal=false
 Categories=Development;Utility;
 StartupNotify=true
-`
+`;
   }
 }
 
-export const autoLaunchManager = new AutoLaunchManager()
+export const autoLaunchManager = new AutoLaunchManager();

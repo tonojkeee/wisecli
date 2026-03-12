@@ -8,7 +8,8 @@
   },
   "sidebar": {
     "files": "Файлы",
-    "agents": "Агенты"
+    "agents": "Агенты",
+    "tasks": "Задачи"
   },
   "terminal": {
     "noAgentSelected": "Агент не выбран",

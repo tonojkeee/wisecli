@@ -8,7 +8,8 @@
   },
   "sidebar": {
     "files": "Files",
-    "agents": "Agents"
+    "agents": "Agents",
+    "tasks": "Tasks"
   },
   "terminal": {
     "noAgentSelected": "No agent selected",

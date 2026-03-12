@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, Users } from "lucide-react";
+import { FolderOpen, Users, ListTodo } from "lucide-react";
 import { Sidebar } from "@renderer/components/layout/Sidebar";
 import { Header } from "@renderer/components/layout/Header";
 import { SessionTabs, CreateSessionDialog } from "@renderer/components/session";
@@ -9,6 +9,7 @@ import { ClaudeSettingsDialog } from "@renderer/components/settings/ClaudeSettin
 import { FileBrowser } from "@renderer/components/filebrowser";
 import { EditorView } from "@renderer/components/editor";
 import { TerminalArea } from "@renderer/components/terminal/TerminalArea";
+import { GlobalTasksPanel } from "@renderer/components/terminal/GlobalTasksPanel";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@renderer/components/ui/tabs";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { useAgentStore, useActiveAgent } from "@renderer/stores/useAgentStore";
@@ -140,7 +141,7 @@ function App() {
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar with Files/Agents tabs */}
+        {/* Sidebar with Files/Agents/Tasks tabs */}
         <Tabs defaultValue="agents" className="w-80 border-r">
           <TabsList className="w-full justify-start rounded-none border-b bg-muted/30 px-2">
             <TabsTrigger value="files" className="gap-1.5 px-2 text-xs">
@@ -150,6 +151,10 @@ function App() {
             <TabsTrigger value="agents" className="gap-1.5 px-2 text-xs">
               <Users className="h-3.5 w-3.5" />
               <span>{t("sidebar.agents")}</span>
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-1.5 px-2 text-xs">
+              <ListTodo className="h-3.5 w-3.5" />
+              <span>{t("sidebar.tasks")}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -171,6 +176,10 @@ function App() {
                 />
               </div>
             </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="tasks" className="m-0 h-[calc(100%-2.5rem)] overflow-hidden">
+            <GlobalTasksPanel className="h-full" />
           </TabsContent>
         </Tabs>
 

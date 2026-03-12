@@ -243,8 +243,11 @@ export const useAgentStore = create<AgentState>((set) => ({
       newAgents.set(agent.id, agent);
       // Clear output buffer for this agent
       outputBufferStore.clearBuffer(agent.id);
-      return { agents: newAgents, activeAgentId: agent.id };
+      return { agents: newAgents };
     });
+    // Set as active agent (this also notifies main process via IPC)
+    set({ activeAgentId: agent.id });
+    window.electronAPI.agent.setActive(agent.id);
   },
 
   updateAgent: (agentId, updates) => {
@@ -280,7 +283,10 @@ export const useAgentStore = create<AgentState>((set) => ({
   },
 
   setActiveAgent: (agentId) => {
+    console.log("[useAgentStore] setActiveAgent called:", agentId);
     set({ activeAgentId: agentId });
+    // Notify main process for statusline routing
+    window.electronAPI.agent.setActive(agentId);
   },
 
   setLoading: (loading) => set({ isLoading: loading }),

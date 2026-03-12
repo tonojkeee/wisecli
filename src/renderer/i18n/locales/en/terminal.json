@@ -13,5 +13,30 @@
     "search": "Search",
     "newSession": "New Session",
     "closeSession": "Close Session"
+  },
+  "tasks": {
+    "title": "Plan Tasks",
+    "sessionTitle": "Session Tasks",
+    "globalTitle": "All Tasks",
+    "loading": "Loading tasks...",
+    "noTasks": "No tasks found",
+    "filter": {
+      "all": "All",
+      "pending": "Pending",
+      "in_progress": "Active",
+      "completed": "Done"
+    },
+    "export": {
+      "title": "Export Tasks",
+      "format": "Format",
+      "options": "Options",
+      "preview": "Preview",
+      "refresh": "Refresh",
+      "includeCompleted": "Include completed",
+      "includeMetadata": "Include metadata",
+      "includeGitInfo": "Include git info",
+      "includeTimeTracking": "Include time tracking",
+      "groupByStatus": "Group by status"
+    }
   }
 }

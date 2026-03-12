@@ -8,7 +8,8 @@
 import { app } from "electron";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { claudeSettings } from "./ClaudeSettings";
+import { claudeSettings } from "./ClaudeSettings.js";
+import { debug } from "../utils/debug.js";
 
 const isWindows = process.platform === "win32";
 
@@ -106,7 +107,10 @@ class HookScriptsManager {
       });
     }
 
-    console.log(`[HookScriptsManager] Installed hook scripts to ${hooksDir}`);
+    debug.log(`[HookScriptsManager] Installed hook scripts to ${hooksDir}`);
+
+    // Migrate from old hooks format to new statusLine format
+    this.migrateToStatusLine();
 
     // Configure hooks in Claude settings
     this.configureClaudeHooks();
@@ -115,24 +119,37 @@ class HookScriptsManager {
   }
 
   /**
+   * Migrate from old PostToolUse/Notification hooks to statusLine
+   */
+  private migrateToStatusLine(): void {
+    const scriptPath = this.getStatuslineScriptPath();
+
+    // Remove old hooks if they exist
+    if (claudeSettings.hasHookScript(scriptPath)) {
+      debug.log("[HookScriptsManager] Migrating from old hooks to statusLine format");
+      claudeSettings.removeHook(scriptPath);
+    }
+  }
+
+  /**
    * Configure hooks in Claude settings.json
    */
   configureClaudeHooks(): boolean {
     const scriptPath = this.getStatuslineScriptPath();
 
-    // Check if already configured
-    if (claudeSettings.hasHookScript(scriptPath)) {
-      console.log("[HookScriptsManager] Hooks already configured in Claude settings");
+    // Check if already configured with statusLine
+    if (claudeSettings.hasStatusLineScript(scriptPath)) {
+      debug.log("[HookScriptsManager] StatusLine already configured in Claude settings");
       return true;
     }
 
-    // Add PostToolUse hook for statusline
-    const success = claudeSettings.addHook("PostToolUse", scriptPath, "");
+    // Configure statusLine hook (receives full statusline data with model, context_window, cost)
+    const success = claudeSettings.configureStatusLine(scriptPath);
 
     if (success) {
-      console.log("[HookScriptsManager] Configured hooks in Claude settings");
+      debug.log("[HookScriptsManager] Configured statusLine in Claude settings");
     } else {
-      console.error("[HookScriptsManager] Failed to configure hooks in Claude settings");
+      console.error("[HookScriptsManager] Failed to configure statusLine in Claude settings");
     }
 
     return success;
@@ -143,22 +160,22 @@ class HookScriptsManager {
    */
   removeClaudeHooks(): boolean {
     const scriptPath = this.getStatuslineScriptPath();
+    // Remove from statusLine
+    if (claudeSettings.hasStatusLineScript(scriptPath)) {
+      return claudeSettings.removeStatusLine();
+    }
+    // Also try to remove from old hooks format (for migration)
     return claudeSettings.removeHook(scriptPath);
   }
 
   /**
    * Get the Claude settings.json hooks configuration
    */
-  getClaudeHooksConfig(): Record<string, unknown[]> {
+  getClaudeHooksConfig(): { statusLine: { type: string; command: string } } {
     const scriptPath = this.getStatuslineScriptPath();
 
     return {
-      PostToolUse: [
-        {
-          matcher: "",
-          hooks: [scriptPath],
-        },
-      ],
+      statusLine: { type: "command", command: scriptPath },
     };
   }
 
@@ -178,7 +195,7 @@ class HookScriptsManager {
    */
   isConfigured(): boolean {
     const scriptPath = this.getStatuslineScriptPath();
-    return claudeSettings.hasHookScript(scriptPath);
+    return claudeSettings.hasStatusLineScript(scriptPath);
   }
 }
 

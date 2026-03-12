@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type {
   AppearanceSettings,
   TerminalSettings,

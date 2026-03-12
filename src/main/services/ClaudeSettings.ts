@@ -14,12 +14,24 @@ export interface ClaudeEnvSettings {
   [key: string]: string | undefined;
 }
 
+export interface ClaudeHook {
+  type: "command";
+  command: string;
+}
+
+export interface StatusLineSettings {
+  type: "command";
+  command: string;
+}
+
 export interface ClaudeSettings {
   env: ClaudeEnvSettings;
   enabledPlugins?: Record<string, boolean>;
   extraKnownMarketplaces?: Record<string, unknown>;
   skipDangerousModePermissionPrompt?: boolean;
-  hooks?: Record<string, Array<{ matcher: string; hooks: string[] }>>;
+  hooks?: Record<string, Array<{ matcher: string; hooks: ClaudeHook[] }>>;
+  /** StatusLine hook configuration - receives full statusline data from Claude Code */
+  statusLine?: StatusLineSettings | null;
   [key: string]: unknown;
 }
 
@@ -164,7 +176,7 @@ class ClaudeSettingsManager {
   /**
    * Set hooks configuration
    */
-  setHooks(hooks: Record<string, Array<{ matcher: string; hooks: string[] }>>): boolean {
+  setHooks(hooks: Record<string, Array<{ matcher: string; hooks: ClaudeHook[] }>>): boolean {
     const settings = this.get();
     settings.hooks = hooks;
     return this.save(settings);
@@ -179,8 +191,10 @@ class ClaudeSettingsManager {
 
     for (const hookType of Object.values(hooks)) {
       for (const hookConfig of hookType) {
-        if (hookConfig.hooks.includes(hookScriptPath)) {
-          return true;
+        for (const hook of hookConfig.hooks) {
+          if (hook.type === "command" && hook.command === hookScriptPath) {
+            return true;
+          }
         }
       }
     }
@@ -198,9 +212,11 @@ class ClaudeSettingsManager {
     // Check if already configured
     if (hooks[hookType]) {
       for (const hookConfig of hooks[hookType]) {
-        if (hookConfig.hooks.includes(hookScriptPath)) {
-          // Already configured
-          return true;
+        for (const hook of hookConfig.hooks) {
+          if (hook.type === "command" && hook.command === hookScriptPath) {
+            // Already configured
+            return true;
+          }
         }
       }
     }
@@ -211,7 +227,7 @@ class ClaudeSettingsManager {
     }
     hooks[hookType].push({
       matcher,
-      hooks: [hookScriptPath],
+      hooks: [{ type: "command", command: hookScriptPath }],
     });
 
     settings.hooks = hooks;
@@ -228,17 +244,62 @@ class ClaudeSettingsManager {
 
     let modified = false;
     for (const [hookType, hookConfigs] of Object.entries(hooks)) {
-      const filtered = hookConfigs.filter((config) => !config.hooks.includes(hookScriptPath));
-      if (filtered.length !== hookConfigs.length) {
-        hooks[hookType] = filtered;
-        modified = true;
+      for (const hookConfig of hookConfigs) {
+        const filtered = hookConfig.hooks.filter(
+          (hook) => !(hook.type === "command" && hook.command === hookScriptPath)
+        );
+        if (filtered.length !== hookConfig.hooks.length) {
+          hookConfig.hooks = filtered;
+          modified = true;
+        }
       }
+      // Remove empty hook configs
+      hooks[hookType] = hookConfigs.filter((config) => config.hooks.length > 0);
     }
 
     if (modified) {
       return this.save(settings);
     }
     return true;
+  }
+
+  /**
+   * Get statusLine configuration
+   */
+  getStatusLine(): StatusLineSettings | null | undefined {
+    const settings = this.get();
+    return settings.statusLine;
+  }
+
+  /**
+   * Set statusLine configuration
+   */
+  setStatusLine(statusLine: StatusLineSettings | null): boolean {
+    const settings = this.get();
+    settings.statusLine = statusLine;
+    return this.save(settings);
+  }
+
+  /**
+   * Check if statusLine is configured with a specific script
+   */
+  hasStatusLineScript(scriptPath: string): boolean {
+    const statusLine = this.getStatusLine();
+    return statusLine?.command === scriptPath;
+  }
+
+  /**
+   * Configure statusLine to use a specific script
+   */
+  configureStatusLine(scriptPath: string): boolean {
+    return this.setStatusLine({ type: "command", command: scriptPath });
+  }
+
+  /**
+   * Remove statusLine configuration
+   */
+  removeStatusLine(): boolean {
+    return this.setStatusLine(null);
   }
 }
 

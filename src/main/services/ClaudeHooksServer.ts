@@ -18,6 +18,7 @@ import {
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { StatuslineInput, DisplayStatusline } from "@shared/types/statusline";
+import { debug } from "../utils/debug.js";
 
 const isWindows = process.platform === "win32";
 
@@ -29,6 +30,8 @@ function parseStatuslineInput(input: StatuslineInput): DisplayStatusline {
     model: input.model?.display_name ?? "unknown",
     contextUsagePercent: input.context_window?.used_percentage ?? null,
     contextRemainingPercent: input.context_window?.remaining_percentage ?? null,
+    contextUsedTokens: input.context_window?.total_input_tokens ?? null,
+    contextWindowSize: input.context_window?.context_window_size ?? null,
     costUsd: input.cost?.total_cost_usd ?? 0,
     cwd: input.cwd ?? "",
     sessionId: input.session_id ?? "",
@@ -53,6 +56,7 @@ async function handleRequest(
   onStatusline: (data: DisplayStatusline) => void,
   onClear: () => void
 ): Promise<void> {
+  debug.log("[ClaudeHooksServer] Received request:", req.method, req.url);
   try {
     // CORS headers
     res.setHeader("Access-Control-Allow-Origin", "localhost");
@@ -78,22 +82,37 @@ async function handleRequest(
         try {
           const parsed = JSON.parse(body) as unknown;
 
-          // Validate basic structure
-          if (
-            typeof parsed !== "object" ||
-            parsed === null ||
-            !("model" in parsed) ||
-            !("context_window" in parsed) ||
-            !("cost" in parsed)
-          ) {
-            respondJson(res, 400, { error: "Invalid statusline data" });
-            return;
-          }
+          debug.log(
+            "[ClaudeHooksServer] Full payload:",
+            JSON.stringify(parsed, null, 2).slice(0, 5000)
+          );
 
-          const input = parsed as StatuslineInput;
-          const statuslineData = parseStatuslineInput(input);
-          onStatusline(statuslineData);
-          respondJson(res, 200, { success: true });
+          // Check if this is statusline data (has model, context_window, cost)
+          if (
+            typeof parsed === "object" &&
+            parsed !== null &&
+            "model" in parsed &&
+            "context_window" in parsed &&
+            "cost" in parsed
+          ) {
+            // Direct statusline format
+            const input = parsed as StatuslineInput;
+            debug.log("[ClaudeHooksServer] Detected statusline format!");
+            debug.log("[ClaudeHooksServer] context_window:", JSON.stringify(input.context_window));
+            const statuslineData = parseStatuslineInput(input);
+            onStatusline(statuslineData);
+            respondJson(res, 200, { success: true });
+          } else if (typeof parsed === "object" && parsed !== null && "hook_event_name" in parsed) {
+            // Hook event format - just acknowledge, no statusline data yet
+            debug.log(
+              "[ClaudeHooksServer] Detected hook event format:",
+              (parsed as { hook_event_name: string }).hook_event_name
+            );
+            respondJson(res, 200, { success: true, note: "hook event received" });
+          } else {
+            debug.log("[ClaudeHooksServer] Unknown format, keys:", Object.keys(parsed as object));
+            respondJson(res, 400, { error: "Invalid statusline data" });
+          }
         } catch (err) {
           console.error("[ClaudeHooksServer] Failed to parse JSON:", err);
           respondJson(res, 400, { error: "Failed to parse JSON" });
@@ -187,7 +206,7 @@ class ClaudeHooksServer {
             // Write port file
             fs.writeFileSync(this.portFilePath, String(this.port));
 
-            console.log(`[ClaudeHooksServer] Listening on TCP port ${this.port}`);
+            debug.log(`[ClaudeHooksServer] Listening on TCP port ${this.port}`);
             resolve(`tcp://127.0.0.1:${this.port}`);
           } else {
             reject(new Error("Failed to get server port"));
@@ -207,7 +226,7 @@ class ClaudeHooksServer {
         }
 
         this.server.listen(this.socketPath, () => {
-          console.log(`[ClaudeHooksServer] Listening on ${this.socketPath}`);
+          debug.log(`[ClaudeHooksServer] Listening on ${this.socketPath}`);
           resolve(this.socketPath!);
         });
       }
@@ -289,6 +308,11 @@ class ClaudeHooksServer {
   private handleStatuslineUpdate(data: DisplayStatusline): void {
     this.lastStatusline = data;
 
+    debug.log(
+      "[ClaudeHooksServer] Received statusline update, currentAgentId:",
+      this.currentAgentId
+    );
+
     // Notify callbacks
     this.updateCallbacks.forEach((callback) => {
       try {
@@ -300,12 +324,18 @@ class ClaudeHooksServer {
 
     // Broadcast to renderer with current agent ID
     if (this.currentAgentId) {
+      debug.log(
+        "[ClaudeHooksServer] Sending statusline to renderer for agent:",
+        this.currentAgentId
+      );
       BrowserWindow.getAllWindows().forEach((win) => {
         win.webContents.send("agent:statusline", {
           agentId: this.currentAgentId,
           statusline: data,
         });
       });
+    } else {
+      debug.log("[ClaudeHooksServer] No current agent, skipping statusline broadcast");
     }
   }
 

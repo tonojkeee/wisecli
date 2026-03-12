@@ -2,6 +2,7 @@ import { BrowserWindow } from "electron";
 import { spawn } from "child_process";
 import { join } from "path";
 import { existsSync, watch, FSWatcher } from "fs";
+import { debug } from "../utils/debug.js";
 
 export type GitFileStatus = "M" | "A" | "D" | "R" | "C" | "?" | "";
 
@@ -148,7 +149,7 @@ class GitService {
       };
     } catch (error) {
       // Git command failed - likely not a git repo or git not installed
-      console.debug("[GitService] getStatus error:", error);
+      debug.debug("[GitService] getStatus error:", error);
       return defaultResult;
     }
   }
@@ -287,7 +288,7 @@ class GitService {
 
       return context;
     } catch (error) {
-      console.debug("[GitService] getChangedFilesContext error:", error);
+      debug.debug("[GitService] getChangedFilesContext error:", error);
       return "";
     }
   }
@@ -326,11 +327,11 @@ class GitService {
       this.watchers.set(repoPath, watcher);
 
       watcher.on("error", (error) => {
-        console.debug("[GitService] Watcher error:", error);
+        debug.debug("[GitService] Watcher error:", error);
         this.stopWatching(repoPath);
       });
     } catch (error) {
-      console.debug("[GitService] Failed to start watching:", error);
+      debug.debug("[GitService] Failed to start watching:", error);
     }
   }
 
@@ -393,7 +394,7 @@ class GitService {
       const status = await this.getStatus(repoPath);
       this.mainWindow.webContents.send("git:status-changed", status);
     } catch (error) {
-      console.debug("[GitService] notifyStatusChanged error:", error);
+      debug.debug("[GitService] notifyStatusChanged error:", error);
     }
   }
 
@@ -434,7 +435,7 @@ class GitService {
       return stdout;
     } catch (error) {
       // File might not exist at this ref, or ref might be invalid
-      console.debug("[GitService] getFileAtRef error:", error);
+      debug.debug("[GitService] getFileAtRef error:", error);
       return null;
     }
   }

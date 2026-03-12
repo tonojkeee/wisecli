@@ -13,5 +13,30 @@
     "search": "Поиск",
     "newSession": "Новая сессия",
     "closeSession": "Закрыть сессию"
+  },
+  "tasks": {
+    "title": "Задачи плана",
+    "sessionTitle": "Задачи сессии",
+    "globalTitle": "Все задачи",
+    "loading": "Загрузка задач...",
+    "noTasks": "Задачи не найдены",
+    "filter": {
+      "all": "Все",
+      "pending": "Ожидание",
+      "in_progress": "В работе",
+      "completed": "Готово"
+    },
+    "export": {
+      "title": "Экспорт задач",
+      "format": "Формат",
+      "options": "Параметры",
+      "preview": "Предпросмотр",
+      "refresh": "Обновить",
+      "includeCompleted": "Включить завершённые",
+      "includeMetadata": "Включить метаданные",
+      "includeGitInfo": "Включить git информацию",
+      "includeTimeTracking": "Включить учёт времени",
+      "groupByStatus": "Группировать по статусу"
+    }
   }
 }
