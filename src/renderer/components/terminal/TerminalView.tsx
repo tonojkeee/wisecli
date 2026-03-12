@@ -157,7 +157,9 @@ export function TerminalView({
 
     const fitAddon = new FitAddon();
     const searchAddon = new SearchAddon();
-    const webLinksAddon = new WebLinksAddon();
+    const webLinksAddon = new WebLinksAddon((_event: MouseEvent, uri: string) => {
+      window.electronAPI.app.openExternal(uri);
+    });
     const clipboardAddon = new ClipboardAddon(new ElectronClipboardProvider());
 
     terminal.loadAddon(fitAddon);
