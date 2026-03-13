@@ -1,28 +1,28 @@
-import React from 'react'
-import { cn } from '@renderer/lib/utils'
+import React from "react";
+import { cn } from "@renderer/lib/utils";
 
 interface SettingInputProps {
-  value: string | number
-  onChange: (value: string) => void
-  type?: 'text' | 'number' | 'password'
-  placeholder?: string
-  disabled?: boolean
-  min?: number
-  max?: number
-  step?: number
-  className?: string
+  value: string | number;
+  onChange: (value: string) => void;
+  type?: "text" | "number" | "password";
+  placeholder?: string;
+  disabled?: boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  className?: string;
 }
 
 export function SettingInput({
   value,
   onChange,
-  type = 'text',
+  type = "text",
   placeholder,
   disabled,
   min,
   max,
   step,
-  className
+  className,
 }: SettingInputProps) {
   return (
     <input
@@ -35,26 +35,27 @@ export function SettingInput({
       max={max}
       step={step}
       className={cn(
-        'h-8 w-full min-w-[120px] max-w-[200px] rounded-md border border-input bg-background px-3 text-sm',
-        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        'placeholder:text-muted-foreground',
+        "h-9 w-full min-w-[120px] max-w-[200px] rounded-lg border border-input/60 bg-muted/30 px-3 text-sm",
+        "hover:bg-muted/50 hover:border-input transition-colors",
+        "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
+        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-muted/30 disabled:hover:border-input/60",
+        "placeholder:text-muted-foreground",
         className
       )}
     />
-  )
+  );
 }
 
 interface SettingSliderProps {
-  value: number
-  onChange: (value: number) => void
-  min: number
-  max: number
-  step?: number
-  disabled?: boolean
-  className?: string
-  showValue?: boolean
-  formatValue?: (value: number) => string
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  step?: number;
+  disabled?: boolean;
+  className?: string;
+  showValue?: boolean;
+  formatValue?: (value: number) => string;
 }
 
 export function SettingSlider({
@@ -66,10 +67,10 @@ export function SettingSlider({
   disabled,
   className,
   showValue = true,
-  formatValue = (v) => v.toString()
+  formatValue = (v) => v.toString(),
 }: SettingSliderProps) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
+    <div className={cn("flex items-center gap-3", className)}>
       <input
         type="range"
         value={value}
@@ -79,21 +80,19 @@ export function SettingSlider({
         step={step}
         disabled={disabled}
         className={cn(
-          'h-2 w-24 cursor-pointer appearance-none rounded-full bg-muted-foreground/20',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          '[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none',
-          '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary',
-          '[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-0',
-          '[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full',
-          '[&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer'
+          "h-2 w-24 cursor-pointer appearance-none rounded-full bg-muted-foreground/20",
+          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none",
+          "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary",
+          "[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-0",
+          "[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full",
+          "[&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
         )}
       />
       {showValue && (
-        <span className="min-w-[3rem] text-sm text-muted-foreground">
-          {formatValue(value)}
-        </span>
+        <span className="min-w-[3rem] text-sm text-muted-foreground">{formatValue(value)}</span>
       )}
     </div>
-  )
+  );
 }

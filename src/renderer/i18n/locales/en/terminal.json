@@ -14,17 +14,52 @@
     "newSession": "New Session",
     "closeSession": "Close Session"
   },
+  "search": {
+    "placeholder": "Search terminal...",
+    "matchCase": "Match case",
+    "regex": "Regular expression",
+    "wholeWord": "Whole word",
+    "previous": "Previous match",
+    "next": "Next match",
+    "close": "Close search",
+    "noResults": "No matches found"
+  },
+  "resume": {
+    "title": "Resume Previous Session?",
+    "description": "A previous Claude session was found. Would you like to resume it with full context, or start a fresh session?",
+    "resume": "Resume Session",
+    "startFresh": "Start Fresh"
+  },
   "tasks": {
     "title": "Plan Tasks",
     "sessionTitle": "Session Tasks",
     "globalTitle": "All Tasks",
     "loading": "Loading tasks...",
     "noTasks": "No tasks found",
+    "noTasksHint": "Tasks will appear here when agents are working",
     "filter": {
       "all": "All",
       "pending": "Pending",
       "in_progress": "Active",
       "completed": "Done"
+    },
+    "contextMenu": {
+      "viewDetails": "View Details",
+      "copySubject": "Copy Subject",
+      "delete": "Delete"
+    },
+    "delete": {
+      "title": "Delete Task",
+      "description": "Are you sure you want to delete this task? This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "clearAll": {
+      "title": "Clear All Tasks",
+      "description": "Are you sure you want to delete all tasks? This action cannot be undone.",
+      "confirm": "Clear All",
+      "cancel": "Cancel",
+      "tooltip": "Clear all tasks"
     },
     "export": {
       "title": "Export Tasks",

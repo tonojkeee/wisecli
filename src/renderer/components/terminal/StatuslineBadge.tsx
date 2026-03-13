@@ -47,9 +47,9 @@ function formatCost(cost: number): string {
  */
 function getContextColorClass(percent: number | null | undefined): string {
   if (percent == null) return "text-muted-foreground";
-  if (percent < 50) return "text-emerald-500";
-  if (percent < 75) return "text-amber-500";
-  return "text-red-500";
+  if (percent < 50) return "text-status-success";
+  if (percent < 75) return "text-status-warning";
+  return "text-status-error";
 }
 
 /**
@@ -57,9 +57,9 @@ function getContextColorClass(percent: number | null | undefined): string {
  */
 function getContextBarColor(percent: number | null | undefined): string {
   if (percent == null) return "bg-muted";
-  if (percent < 50) return "bg-emerald-500";
-  if (percent < 75) return "bg-amber-500";
-  return "bg-red-500";
+  if (percent < 50) return "bg-status-success";
+  if (percent < 75) return "bg-status-warning";
+  return "bg-status-error";
 }
 
 /**
@@ -92,6 +92,9 @@ export function StatuslineBadge({ agentId, className }: StatuslineBadgeProps) {
           "text-xs text-muted-foreground/60",
           className
         )}
+        role="status"
+        aria-live="polite"
+        aria-label="Waiting for Claude status"
       >
         <Loader2 className="h-3 w-3 animate-spin" />
         <span>Waiting...</span>
@@ -123,6 +126,9 @@ export function StatuslineBadge({ agentId, className }: StatuslineBadgeProps) {
         className
       )}
       title={tooltipLines.join("\n")}
+      role="status"
+      aria-live="polite"
+      aria-label={`Claude status: Model ${statusline.model}, Context ${contextPercent != null ? Math.round(contextPercent) : "?"}%, Cost ${formatCost(statusline.costUsd)}`}
     >
       {/* Model pill */}
       <span className="flex items-center gap-1 text-foreground/80">
@@ -139,7 +145,7 @@ export function StatuslineBadge({ agentId, className }: StatuslineBadgeProps) {
       </span>
 
       {/* Cost pill */}
-      <span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+      <span className="flex items-center gap-0.5 text-status-success">
         <DollarSign className="h-3 w-3" />
         <span className="tabular-nums">{formatCost(statusline.costUsd)}</span>
       </span>

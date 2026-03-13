@@ -250,4 +250,42 @@ export const taskActions = {
   async exportJSON(sessionId?: string, options?: TaskJsonExportOptions): Promise<string> {
     return window.electronAPI.tasks.exportJSON(sessionId, options);
   },
+
+  async deleteTask(
+    sessionId: string | undefined,
+    taskId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const result = await window.electronAPI.tasks.delete(sessionId, taskId);
+
+    if (result.success) {
+      // Optimistically update local state
+      const store = useClaudeTaskStore.getState();
+      const newTasks = store.tasks.filter((t) => t.id !== taskId);
+      store.setTasks(newTasks);
+    }
+
+    return result;
+  },
+
+  async deleteAllTasks(
+    sessionId: string | undefined
+  ): Promise<{ success: boolean; error?: string; deletedCount?: number }> {
+    const result = await window.electronAPI.tasks.deleteAll(sessionId);
+
+    if (result.success) {
+      // Optimistically update local state
+      const store = useClaudeTaskStore.getState();
+      store.setTasks([]);
+      store.setStats({
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        blocked: 0,
+        progressPercent: 0,
+      });
+    }
+
+    return result;
+  },
 };

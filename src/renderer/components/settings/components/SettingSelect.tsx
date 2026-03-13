@@ -1,18 +1,24 @@
-import React from 'react'
-import { cn } from '@renderer/lib/utils'
-import { ChevronDown } from 'lucide-react'
+import * as React from "react";
+import { ChevronDown, Check } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@renderer/components/ui/dropdown-menu";
+import { cn } from "@renderer/lib/utils";
 
 interface SettingSelectOption {
-  value: string
-  label: string
+  value: string;
+  label: string;
 }
 
 interface SettingSelectProps {
-  value: string
-  onChange: (value: string) => void
-  options: SettingSelectOption[]
-  disabled?: boolean
-  className?: string
+  value: string;
+  onChange: (value: string) => void;
+  options: SettingSelectOption[];
+  disabled?: boolean;
+  className?: string;
 }
 
 export function SettingSelect({
@@ -20,28 +26,49 @@ export function SettingSelect({
   onChange,
   options,
   disabled,
-  className
+  className,
 }: SettingSelectProps) {
+  const selectedOption = options.find((opt) => opt.value === value);
+  const [open, setOpen] = React.useState(false);
+
+  const handleSelect = (optionValue: string) => {
+    onChange(optionValue);
+    setOpen(false);
+  };
+
   return (
-    <div className={cn('relative', className)}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
         disabled={disabled}
         className={cn(
-          'appearance-none h-8 min-w-[120px] rounded-md border border-input bg-background px-3 pr-8 text-sm',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          'cursor-pointer'
+          "flex h-9 min-w-[140px] items-center justify-between gap-2 rounded-lg border border-input/60 bg-muted/30 px-3 text-sm",
+          "hover:bg-muted/50 hover:border-input transition-colors",
+          "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "data-[state=open]:ring-2 data-[state=open]:ring-primary/50 data-[state=open]:border-primary",
+          className
         )}
       >
+        <span>{selectedOption?.label || value}</span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 opacity-50 transition-transform duration-200",
+            open && "rotate-180"
+          )}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[140px]">
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
+          <DropdownMenuItem
+            key={option.value}
+            onClick={() => handleSelect(option.value)}
+            className="flex items-center justify-between"
+          >
+            <span>{option.label}</span>
+            {option.value === value && <Check className="h-4 w-4 text-primary" />}
+          </DropdownMenuItem>
         ))}
-      </select>
-      <ChevronDown className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none text-muted-foreground" />
-    </div>
-  )
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }

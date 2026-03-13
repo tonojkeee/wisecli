@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { useSyncExternalStore, useCallback, useMemo } from "react";
 import { RingBuffer } from "@shared/utils/RingBuffer";
+import { logger } from "@renderer/lib/logger";
+import { setActiveChatAgent } from "./useChatStore";
 
 // ============================================
 // Agent Types
@@ -37,6 +39,7 @@ export interface AgentMeta {
   status: AgentStatus;
   createdAt: Date;
   lastActivity: Date;
+  claudeSessionId?: string; // Claude CLI session ID for resume functionality
 }
 
 // Result type for useAgentOutputBuffer with version info
@@ -70,13 +73,13 @@ class OutputBufferStore {
   }
 
   appendOutput(agentId: string, data: string): void {
-    console.log("[STORE] appendOutput:", agentId.slice(0, 8), data.length, "bytes");
+    logger.debug("[STORE] appendOutput:", agentId.slice(0, 8), data.length, "bytes");
     const buffer = this.getBuffer(agentId);
     buffer.push(data);
     // Increment version
     const newVersion = (this.versions.get(agentId) || 0) + 1;
     this.versions.set(agentId, newVersion);
-    console.log("[STORE] version now:", newVersion);
+    logger.debug("[STORE] version now:", newVersion);
     // Invalidate caches
     this.cachedSnapshots.delete(agentId);
     this.cachedResults.delete(agentId);
@@ -220,13 +223,14 @@ interface AgentState {
   setAgents: (agents: AgentMeta[]) => void;
   addAgent: (agent: AgentMeta) => void;
   updateAgent: (agentId: string, updates: Partial<AgentMeta>) => void;
+  updateClaudeSessionId: (agentId: string, claudeSessionId: string) => void;
   removeAgent: (agentId: string) => void;
   setActiveAgent: (agentId: string | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 }
 
-export const useAgentStore = create<AgentState>((set) => ({
+export const useAgentStore = create<AgentState>((set, get) => ({
   agents: new Map(),
   activeAgentId: null,
   isLoading: false,
@@ -251,12 +255,14 @@ export const useAgentStore = create<AgentState>((set) => ({
     // Set as active agent (this also notifies main process via IPC)
     set({ activeAgentId: agent.id });
     window.electronAPI.agent.setActive(agent.id);
+    // Clear chat selection for mutual exclusivity
+    setActiveChatAgent(null);
   },
 
   updateAgent: (agentId, updates) => {
     set((state) => {
       const agent = state.agents.get(agentId);
-      console.log(
+      logger.debug(
         "[useAgentStore] updateAgent called:",
         agentId,
         updates,
@@ -267,6 +273,24 @@ export const useAgentStore = create<AgentState>((set) => ({
 
       const newAgents = new Map(state.agents);
       newAgents.set(agentId, { ...agent, ...updates });
+      return { agents: newAgents };
+    });
+  },
+
+  updateClaudeSessionId: (agentId, claudeSessionId) => {
+    set((state) => {
+      const agent = state.agents.get(agentId);
+      if (!agent) return state;
+
+      logger.debug(
+        "[useAgentStore] updateClaudeSessionId:",
+        agentId.slice(0, 8),
+        "->",
+        claudeSessionId.slice(0, 8)
+      );
+
+      const newAgents = new Map(state.agents);
+      newAgents.set(agentId, { ...agent, claudeSessionId });
       return { agents: newAgents };
     });
   },
@@ -286,7 +310,13 @@ export const useAgentStore = create<AgentState>((set) => ({
   },
 
   setActiveAgent: (agentId) => {
-    console.log("[useAgentStore] setActiveAgent called:", agentId);
+    const currentId = get().activeAgentId;
+    // Skip if already active (idempotency check)
+    if (currentId === agentId) {
+      logger.debug("[useAgentStore] setActiveAgent skipped - already active:", agentId);
+      return;
+    }
+    logger.debug("[useAgentStore] setActiveAgent called:", agentId);
     set({ activeAgentId: agentId });
     // Notify main process for statusline routing
     window.electronAPI.agent.setActive(agentId);
@@ -312,6 +342,13 @@ export const getOutputBuffer = (agentId: string): string[] => {
 
 export const getOutputVersion = (agentId: string): number => {
   return outputBufferStore.getVersion(agentId);
+};
+
+/**
+ * Direct access to setActiveAgent (for cross-store coordination)
+ */
+export const setActiveAgent = (agentId: string | null): void => {
+  useAgentStore.getState().setActiveAgent(agentId);
 };
 
 // Combined type for backward compatibility

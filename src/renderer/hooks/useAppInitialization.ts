@@ -7,6 +7,7 @@ import { useAgentStore, appendOutput, isValidAgentStatus } from "@renderer/store
 import { useTodoStore } from "@renderer/stores/useTodoStore";
 import { useStatuslineStore } from "@renderer/stores/useStatuslineStore";
 import { useClaudeCodeStore } from "@renderer/stores/useClaudeCodeStore";
+import { logger } from "@renderer/lib/logger";
 
 // Module-level guard to prevent multiple IPC subscriptions
 // This persists across React component re-mounts and HMR
@@ -79,15 +80,15 @@ export function useAppInitialization() {
   useEffect(() => {
     // Check if already subscribed at module level
     if (ipcSubscriptionsActive) {
-      console.log("[INIT] IPC subscriptions already active, skipping");
+      logger.debug("[INIT] IPC subscriptions already active, skipping");
       return;
     }
 
-    console.log("[INIT] Setting up IPC subscriptions");
+    logger.debug("[INIT] Setting up IPC subscriptions");
     ipcSubscriptionsActive = true;
 
     const unsubOutput = window.electronAPI.agent.onOutput((event) => {
-      console.log(
+      logger.debug(
         "[RENDERER] onOutput received:",
         event.agentId.slice(0, 8),
         event.data.length,
@@ -118,6 +119,11 @@ export function useAppInitialization() {
       useStatuslineStore.getState().setStatusline(event.agentId, event.statusline);
     });
 
+    const unsubClaudeSession = window.electronAPI.agent.onClaudeSession((event) => {
+      // Update agent's claudeSessionId when received from hooks
+      useAgentStore.getState().updateClaudeSessionId(event.agentId, event.claudeSessionId);
+    });
+
     // Claude Code IDE integration events
     const unsubClaudeStatus = window.electronAPI.claudeCode.onStatus((status) => {
       useClaudeCodeStore.getState().setStatus(status);
@@ -135,12 +141,13 @@ export function useAppInitialization() {
       unsubExited,
       unsubTodos,
       unsubStatusline,
+      unsubClaudeSession,
       unsubClaudeStatus,
       unsubClaudeOpenFile,
     ];
 
     return () => {
-      console.log("[INIT] Cleaning up IPC subscriptions");
+      logger.debug("[INIT] Cleaning up IPC subscriptions");
       unsubscribeCallbacks.forEach((unsub) => unsub());
       unsubscribeCallbacks = [];
       ipcSubscriptionsActive = false;

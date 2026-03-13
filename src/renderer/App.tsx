@@ -1,27 +1,22 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, Users, ListTodo, Plus } from "lucide-react";
-import { Sidebar } from "@renderer/components/layout/Sidebar";
-import { ResizableSidebar } from "@renderer/components/layout/ResizableSidebar";
 import { Header } from "@renderer/components/layout/Header";
-import { SessionTabs, CreateSessionDialog } from "@renderer/components/session";
+import { CreateSessionDialog } from "@renderer/components/session";
 import { SettingsPage } from "@renderer/components/settings";
 import { ClaudeSettingsDialog } from "@renderer/components/settings/ClaudeSettingsDialog";
-import { FileBrowser } from "@renderer/components/filebrowser";
 import { EditorView } from "@renderer/components/editor";
 import { TerminalArea } from "@renderer/components/terminal/TerminalArea";
-import { GlobalTasksPanel } from "@renderer/components/terminal/GlobalTasksPanel";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@renderer/components/ui/tabs";
-import { ScrollArea } from "@renderer/components/ui/scroll-area";
-import { Button } from "@renderer/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@renderer/components/ui/tooltip";
+import { useResumeConfirmation } from "@renderer/components/terminal/ResumeConfirmationDialog";
+import { ResizableSidebar } from "@renderer/components/layout/ResizableSidebar";
+import { Sidebar } from "@renderer/components/sidebar";
+import { ErrorBoundary } from "@renderer/components/ui/ErrorBoundary";
 import { useAgentStore, useActiveAgent } from "@renderer/stores/useAgentStore";
 import { useSessionStore, useActiveSession } from "@renderer/stores/useSessionStore";
+import {
+  useChatStore,
+  useActiveChatAgent,
+  setActiveChatAgent,
+} from "@renderer/stores/useChatStore";
 import { useFileStore } from "@renderer/stores/useFileStore";
 import { useTodoStore } from "@renderer/stores/useTodoStore";
 import {
@@ -36,8 +31,10 @@ import {
   useSessionActions,
   useAgentActions,
   useSidebar,
+  useSidebarKeyboardNav,
+  useChatInitialization,
+  useChatActions,
 } from "@renderer/hooks";
-import { cn } from "@renderer/lib/utils";
 
 function App() {
   const { t } = useTranslation("app");
@@ -61,6 +58,9 @@ function App() {
   // Initialize app (load sessions, agents, subscribe to events)
   useAppInitialization();
 
+  // Initialize chat IPC event listeners
+  useChatInitialization();
+
   // Agent store
   const activeAgent = useActiveAgent();
   const activeAgentId = useAgentStore((state) => state.activeAgentId);
@@ -72,12 +72,24 @@ function App() {
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const setActiveSession = useSessionStore((state) => state.setActiveSession);
 
-  // Get agents for active session
+  // Get ALL agents from all sessions
   const agentsMap = useAgentStore((state) => state.agents);
-  const sessionAgents = useMemo(() => {
-    if (!activeSessionId) return [];
-    return Array.from(agentsMap.values()).filter((a) => a.sessionId === activeSessionId);
-  }, [agentsMap, activeSessionId]);
+  const allAgents = useMemo(() => {
+    return Array.from(agentsMap.values());
+  }, [agentsMap]);
+
+  // Build agents by session map for the new sidebar
+  const agentsBySession = useMemo(() => {
+    const map = new Map<string, typeof allAgents>();
+    allAgents.forEach((agent) => {
+      const sessionId = agent.sessionId;
+      if (!map.has(sessionId)) {
+        map.set(sessionId, []);
+      }
+      map.get(sessionId)!.push(agent);
+    });
+    return map;
+  }, [allAgents]);
 
   // Get open files for editor panel visibility
   const openFiles = useFileStore((state) => state.openFiles);
@@ -92,17 +104,47 @@ function App() {
     return count;
   }, [todosByAgent]);
 
-  // Count running agents
-  const runningAgentsCount = useMemo(() => {
-    return sessionAgents.filter((a) => a.status === "running").length;
-  }, [sessionAgents]);
+  // Chat store and actions
+  const chatAgentsMap = useChatStore((state) => state.chatAgents);
+  // Note: activeChatAgentId is accessed via useActiveChatAgent() hook below
+  const activeChatAgent = useActiveChatAgent();
+
+  // Get streaming chats count for badge
+  const streamingChatsCount = useMemo(() => {
+    let count = 0;
+    chatAgentsMap.forEach((agent) => {
+      if (agent.status === "streaming") count++;
+    });
+    return count;
+  }, [chatAgentsMap]);
 
   // Session and agent actions
   const { createSession, deleteSession } = useSessionActions();
-  const { startAgent, killAgent, sendCommand, exportLogs, hasActiveSession } = useAgentActions();
+  const { startAgent, killAgent, sendCommand, exportLogs, hasActiveSession, getResumableSession } =
+    useAgentActions();
+
+  // Resume confirmation dialog
+  const [confirmResume, ResumeDialog] = useResumeConfirmation();
+
+  // Chat actions
+  const { createChatAgent, deleteChatAgent, selectChatAgent } = useChatActions();
 
   // Command shortcuts
   useCommandShortcuts(sendCommand, !!activeAgentId);
+
+  // Keyboard navigation for sidebar
+  useSidebarKeyboardNav({
+    activeSection: sidebar.activeSection,
+    onSectionChange: sidebar.setActiveSection,
+    focusedItem: sidebar.focusedItem,
+    onFocusItem: sidebar.setFocusedItem,
+    items: sessions.map((s) => ({ id: s.id })),
+    onSelectItem: (id: string) => setActiveSession(id),
+    onDeleteItem: (id: string) => handleDeleteSession(id),
+    onToggleSidebar: sidebar.toggleCollapse,
+    onFocusSearch: () => sidebar.setIsSearchFocused(true),
+    enabled: !sidebar.collapsed,
+  });
 
   // Handlers
   const handleDeleteSession = useCallback(
@@ -112,9 +154,31 @@ function App() {
     [deleteSession]
   );
 
-  const handleStartAgent = useCallback(async () => {
-    await startAgent();
-  }, [startAgent]);
+  const handleStartAgent = useCallback(
+    async (sessionId?: string) => {
+      const targetSessionId = sessionId ?? activeSessionId;
+      if (!targetSessionId) {
+        await startAgent();
+        return;
+      }
+
+      // Check for resumable Claude session
+      const claudeSessionId = await getResumableSession(targetSessionId);
+
+      if (claudeSessionId) {
+        // Ask user whether to resume or start fresh
+        const shouldResume = await confirmResume();
+        if (shouldResume) {
+          await startAgent(targetSessionId, claudeSessionId);
+        } else {
+          await startAgent(targetSessionId);
+        }
+      } else {
+        await startAgent(targetSessionId);
+      }
+    },
+    [startAgent, getResumableSession, confirmResume, activeSessionId]
+  );
 
   const handleKillAgent = useCallback(
     async (agentId: string) => {
@@ -134,6 +198,82 @@ function App() {
     await exportLogs();
   }, [exportLogs]);
 
+  // Handle agent selection with session switching
+  const handleSelectAgent = useCallback(
+    (agentId: string) => {
+      // Get current state directly from store to avoid stale closure
+      const currentActiveId = useAgentStore.getState().activeAgentId;
+      const currentChatId = useChatStore.getState().activeChatAgentId;
+      console.log("[handleSelectAgent] called with:", agentId);
+      console.log("[handleSelectAgent] currentActiveId:", currentActiveId);
+      console.log("[handleSelectAgent] currentChatId:", currentChatId);
+
+      if (currentActiveId === agentId) {
+        console.log("[handleSelectAgent] early return - same agent");
+        return;
+      }
+
+      const agent = agentsMap.get(agentId);
+      if (agent) {
+        if (agent.sessionId !== activeSessionId) {
+          setActiveSession(agent.sessionId);
+        }
+        setActiveAgent(agentId);
+        // Clear chat selection for mutual exclusivity
+        console.log("[handleSelectAgent] calling setActiveChatAgent(null)");
+        setActiveChatAgent(null);
+        console.log(
+          "[handleSelectAgent] after setActiveChatAgent(null), chatId:",
+          useChatStore.getState().activeChatAgentId
+        );
+      }
+    },
+    [agentsMap, activeSessionId, setActiveSession, setActiveAgent]
+  );
+
+  // Chat handlers
+  const handleCreateChat = useCallback(async () => {
+    if (activeSessionId) {
+      await createChatAgent(activeSessionId);
+    }
+  }, [activeSessionId, createChatAgent]);
+
+  const handleSelectChat = useCallback(
+    (chatId: string) => {
+      // Get current state directly from store to avoid stale closure
+      const currentActiveChatId = useChatStore.getState().activeChatAgentId;
+      console.log("[handleSelectChat] called with:", chatId);
+      console.log("[handleSelectChat] currentActiveChatId:", currentActiveChatId);
+
+      if (currentActiveChatId === chatId) {
+        console.log("[handleSelectChat] early return - same chat");
+        return;
+      }
+
+      console.log("[handleSelectChat] calling selectChatAgent");
+      selectChatAgent(chatId);
+      console.log("[handleSelectChat] calling setActiveAgent(null)");
+      console.log(
+        "[handleSelectChat] activeAgentId BEFORE:",
+        useAgentStore.getState().activeAgentId
+      );
+      // Clear terminal agent selection for mutual exclusivity
+      setActiveAgent(null);
+      console.log(
+        "[handleSelectChat] activeAgentId AFTER:",
+        useAgentStore.getState().activeAgentId
+      );
+    },
+    [selectChatAgent, setActiveAgent]
+  );
+
+  const handleDeleteChat = useCallback(
+    async (chatId: string) => {
+      await deleteChatAgent(chatId);
+    },
+    [deleteChatAgent]
+  );
+
   // Terminal settings with fallbacks
   const terminalFontSize = appTerminal?.fontSize ?? appAppearance?.fontSize ?? 14;
   const terminalFontFamily =
@@ -142,175 +282,100 @@ function App() {
   // Show settings page if open
   if (showAppSettings) {
     return (
-      <div className="h-screen bg-background">
-        <SettingsPage onBack={() => setShowAppSettings(false)} />
-      </div>
+      <ErrorBoundary>
+        <div className="h-screen bg-background">
+          <SettingsPage onBack={() => setShowAppSettings(false)} />
+        </div>
+      </ErrorBoundary>
     );
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      {/* Header */}
-      <Header
-        hasActiveAgent={!!activeAgent}
-        onOpenAppSettings={() => setShowAppSettings(true)}
-        onOpenClaudeSettings={() => setShowClaudeSettings(true)}
-        onExportLogs={handleExportLogs}
-      />
-
-      {/* Session Tabs */}
-      <SessionTabs
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelectSession={setActiveSession}
-        onCreateSession={() => setShowCreateSession(true)}
-        onDeleteSession={handleDeleteSession}
-      />
-
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar with Files/Agents/Tasks tabs */}
-        <ResizableSidebar
-          width={sidebar.width}
-          collapsed={sidebar.collapsed}
-          collapsedWidth={sidebar.collapsedWidth}
-          minWidth={sidebar.minWidth}
-          maxWidth={sidebar.maxWidth}
-          onWidthChange={sidebar.setWidth}
-          onToggleCollapse={sidebar.toggleCollapse}
+    <ErrorBoundary>
+      <div className="flex h-screen flex-col bg-background">
+        {/* Skip to main content link */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-3 focus:py-1.5 focus:bg-background focus:border focus:border-primary focus:rounded-md focus:text-sm focus:font-medium focus:shadow-lg"
         >
-          <Tabs defaultValue="agents" className="flex h-full flex-col">
-            <TabsList className="w-full justify-start rounded-none border-b bg-muted/30 px-2">
-              <TooltipProvider delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <TabsTrigger value="files" className="gap-1.5 px-2 text-xs">
-                      <FolderOpen className="h-3.5 w-3.5" />
-                      {!sidebar.collapsed && <span>{t("sidebar.files")}</span>}
-                      {openFiles.size > 0 && (
-                        <span className="ml-0.5 rounded-full bg-primary/20 px-1.5 text-[10px] font-medium">
-                          {openFiles.size}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  </TooltipTrigger>
-                  {sidebar.collapsed && (
-                    <TooltipContent side="right">{t("sidebar.files")}</TooltipContent>
-                  )}
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <TabsTrigger value="agents" className="gap-1.5 px-2 text-xs">
-                      <Users className="h-3.5 w-3.5" />
-                      {!sidebar.collapsed && <span>{t("sidebar.agents")}</span>}
-                      {runningAgentsCount > 0 && (
-                        <span className="ml-0.5 rounded-full bg-emerald-500/20 px-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                          {runningAgentsCount}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  </TooltipTrigger>
-                  {sidebar.collapsed && (
-                    <TooltipContent side="right">{t("sidebar.agents")}</TooltipContent>
-                  )}
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <TabsTrigger value="tasks" className="gap-1.5 px-2 text-xs">
-                      <ListTodo className="h-3.5 w-3.5" />
-                      {!sidebar.collapsed && <span>{t("sidebar.tasks")}</span>}
-                      {totalPendingTasks > 0 && (
-                        <span className="ml-0.5 rounded-full bg-amber-500/20 px-1.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                          {totalPendingTasks}
-                        </span>
-                      )}
-                    </TabsTrigger>
-                  </TooltipTrigger>
-                  {sidebar.collapsed && (
-                    <TooltipContent side="right">{t("sidebar.tasks")}</TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-            </TabsList>
+          {t("skipToContent", "Skip to main content")}
+        </a>
 
-            <TabsContent
-              value="files"
-              className="m-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
-            >
-              <FileBrowser
-                projectPath={activeSession?.workingDirectory || null}
-                className="h-full"
-              />
-            </TabsContent>
+        {/* Header */}
+        <Header
+          hasActiveAgent={!!activeAgent}
+          onOpenAppSettings={() => setShowAppSettings(true)}
+          onOpenClaudeSettings={() => setShowClaudeSettings(true)}
+          onExportLogs={handleExportLogs}
+        />
 
-            <TabsContent
-              value="agents"
-              className="m-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
-            >
-              <ScrollArea className="h-full">
-                <div className="p-3">
-                  {/* New Agent button - moved from Sidebar header */}
-                  <div className="mb-3">
-                    <Button
-                      size="sm"
-                      onClick={handleStartAgent}
-                      disabled={!hasActiveSession}
-                      className="h-7 w-full gap-1.5 shadow-sm"
-                      title={t("agents.startNewAgent", { ns: "agents" })}
-                    >
-                      <Plus className="h-3 w-3" />
-                      {!sidebar.collapsed && (
-                        <span className="text-[11px]">{t("agents.new", { ns: "agents" })}</span>
-                      )}
-                    </Button>
-                  </div>
-                  <Sidebar
-                    sessionAgents={sessionAgents}
-                    activeAgentId={activeAgentId}
-                    hasActiveSession={hasActiveSession}
-                    onSelectAgent={setActiveAgent}
-                    onKillAgent={handleKillAgent}
-                    onStartAgent={handleStartAgent}
-                    onCommand={handleCommand}
-                    compactMode={sidebar.collapsed}
-                  />
-                </div>
-              </ScrollArea>
-            </TabsContent>
+        {/* Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar with new Activity Panel design */}
+          <ResizableSidebar
+            width={sidebar.width}
+            collapsed={sidebar.collapsed}
+            collapsedWidth={sidebar.collapsedWidth}
+            onToggleCollapse={sidebar.toggleCollapse}
+          >
+            <Sidebar
+              activeSection={sidebar.activeSection}
+              onSectionChange={sidebar.setActiveSection}
+              searchQuery={sidebar.searchQuery}
+              onSearchChange={sidebar.setSearchQuery}
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              agentsBySession={agentsBySession}
+              onSelectSession={setActiveSession}
+              onCreateSession={() => setShowCreateSession(true)}
+              onDeleteSession={handleDeleteSession}
+              projectPath={activeSession?.workingDirectory || null}
+              openFilesCount={openFiles.size}
+              agents={allAgents}
+              activeAgentId={activeAgentId}
+              onSelectAgent={handleSelectAgent}
+              onKillAgent={handleKillAgent}
+              onStartAgent={handleStartAgent}
+              onCommand={handleCommand}
+              hasActiveSession={hasActiveSession}
+              pendingTasksCount={totalPendingTasks}
+              streamingChatsCount={streamingChatsCount}
+              onCreateChat={handleCreateChat}
+              onSelectChat={handleSelectChat}
+              onDeleteChat={handleDeleteChat}
+              collapsed={sidebar.collapsed}
+            />
+          </ResizableSidebar>
 
-            <TabsContent
-              value="tasks"
-              className="m-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
-            >
-              <GlobalTasksPanel className="h-full" />
-            </TabsContent>
-          </Tabs>
-        </ResizableSidebar>
+          {/* Editor panel (shown when files are open) */}
+          {openFiles.size > 0 && <EditorView className="flex-1 border-r" />}
 
-        {/* Editor panel (shown when files are open) */}
-        {openFiles.size > 0 && <EditorView className="flex-1 border-r" />}
+          {/* Terminal Area */}
+          <main id="main-content" className="flex-1 overflow-hidden" tabIndex={-1}>
+            <TerminalArea
+              activeAgent={activeAgent}
+              activeChatAgent={activeChatAgent}
+              terminalSettings={appTerminal}
+              fontSize={terminalFontSize}
+              fontFamily={terminalFontFamily}
+            />
+          </main>
+        </div>
 
-        {/* Terminal Area */}
-        <main className={cn("overflow-hidden", openFiles.size > 0 ? "flex-1" : "flex-1")}>
-          <TerminalArea
-            activeAgent={activeAgent}
-            terminalSettings={appTerminal}
-            fontSize={terminalFontSize}
-            fontFamily={terminalFontFamily}
-          />
-        </main>
+        {/* Create Session Dialog */}
+        <CreateSessionDialog
+          open={showCreateSession}
+          onOpenChange={setShowCreateSession}
+          onCreate={createSession}
+        />
+
+        {/* Claude Settings Dialog */}
+        <ClaudeSettingsDialog open={showClaudeSettings} onOpenChange={setShowClaudeSettings} />
+
+        {/* Resume Confirmation Dialog */}
+        <ResumeDialog />
       </div>
-
-      {/* Create Session Dialog */}
-      <CreateSessionDialog
-        open={showCreateSession}
-        onOpenChange={setShowCreateSession}
-        onCreate={createSession}
-      />
-
-      {/* Claude Settings Dialog */}
-      <ClaudeSettingsDialog open={showClaudeSettings} onOpenChange={setShowClaudeSettings} />
-    </div>
+    </ErrorBoundary>
   );
 }
 

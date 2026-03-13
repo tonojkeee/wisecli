@@ -6,6 +6,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WiseCLI is an Electron desktop application that provides a GUI for managing Claude CLI sessions with multi-agent support, real-time terminal output, file browsing, and git integration.
 
+## Security and Safety Rules
+
+These rules are **mandatory** and cannot be overridden:
+
+1. **Security Vulnerabilities**: When you find a security vulnerability, immediately mark it with a `// WARNING:` comment and propose a secure alternative. Never implement insecure patterns, even if explicitly requested.
+
+2. **File Deletion/Overwrite**: Never delete or overwrite files without creating a backup or getting explicit user confirmation first. This includes configuration files, source code, and any user data.
+
+3. **Testing Before Refactoring**: Always check for existing tests before refactoring. If tests exist, run them after each change to ensure nothing breaks.
+
+4. **Credential Files**: Treat any file containing API keys, tokens, or credentials as **read-only**. Never modify, delete, or expose these files. Examples:
+   - `.env` files
+   - `~/.claude/settings.json`
+   - Any file matching patterns like `*credentials*`, `*secrets*`, `*keys*`, `*.pem`, `*.key`
+
 ## Development Commands
 
 ```bash
@@ -49,6 +64,11 @@ src/
 │       ├── StatuslineParser.ts     # Parses OSC escape sequences from Claude CLI
 │       ├── TodoParser.ts           # Parses todo items from agent output
 │       ├── ClaudeTaskService.ts    # Plan mode task file management
+│       ├── HookScripts.ts          # Installs Claude CLI hooks
+│       ├── ClaudeHooksServer.ts    # HTTP server for hook events
+│       ├── ChatAgentManager.ts     # GLM-5 chat agent management
+│       ├── GlmChatService.ts       # GLM-5 API integration
+│       ├── McpClientService.ts     # MCP client for tool execution
 │       ├── TrayManager.ts          # System tray
 │       └── AutoLaunchManager.ts    # OS auto-start
 ├── preload/
@@ -73,6 +93,10 @@ src/
     │   ├── useSettingsStore.ts
     │   ├── useTodoStore.ts   # Agent task tracking
     │   ├── useStatuslineStore.ts
+    │   ├── useChatStore.ts   # Chat agents and messages
+    │   ├── useSidebarStore.ts  # Sidebar state (collapsed, width, active section)
+    │   ├── useClaudeTaskStore.ts  # Plan mode tasks
+    │   ├── useClaudeCodeStore.ts  # IDE integration state
     │   └── RingBuffer.ts     # O(1) ring buffer for terminal output
     ├── hooks/                # Custom React hooks
     ├── i18n/                 # React-i18next localization (en, ru)
@@ -90,7 +114,7 @@ src/
 Terminal output is handled specially to prevent performance issues:
 
 1. **Main Process** (`AgentProcessManager`):
-   - Batches PTY output (100ms debounce, max 100 items per batch) to prevent IPC flooding
+   - Batches PTY output (16ms debounce (~60fps), max 100 items per batch) to prevent IPC flooding
    - Maintains ring buffer (1000 items) for history
 
 2. **Renderer Process** (`useAgentStore.ts`):
@@ -128,7 +152,7 @@ For events from main to renderer:
 `AgentProcessManager` spawns Claude CLI as a PTY process:
 
 - Uses `node-pty` for terminal emulation
-- Batches output to prevent IPC flooding (100ms debounce, max 100 items)
+- Batches output to prevent IPC flooding (16ms debounce (~60fps), max 100 items)
 - Maintains ring buffer (1000 items) for output history
 - Injects git context via `GIT_CHANGED_FILES_CONTEXT` env var for contextual awareness
 
@@ -168,6 +192,26 @@ Two parallel tracking systems:
 1. **TodoParser** (real-time): Parses todo items from agent terminal output, stored in `useTodoStore`
 2. **ClaudeTaskService** (plan mode): Reads/writes `.claude/tasks/{session}/` markdown files for persistent task tracking
 
+### GLM-5 Chat Integration
+
+Separate chat system for GLM-5 model with MCP tool support:
+
+- **ChatAgentManager**: Manages chat sessions and message history
+- **GlmChatService**: Streams responses from GLM-5 API via SSE
+- **McpClientService**: Executes MCP tools requested by the chat agent
+- **IPC domain**: `chat` - create, delete, send message, stream events
+- **Store**: `useChatStore` - chat agents and messages
+- **Hooks**: `useChatActions`, `useChatInitialization`
+
+### Hook Scripts (Statusline Integration)
+
+Installs and manages Claude CLI hooks for real-time statusline updates:
+
+- **HookScripts**: Installs hook scripts to `~/.claude/hooks/`
+- **ClaudeHooksServer**: HTTP server (port 45673) receiving hook events
+- Hooks configured in `~/.claude/settings.json` under `hooks` key
+- Enables statusline updates without WebSocket dependency
+
 ## Key Patterns
 
 ### Adding a New IPC Method
@@ -177,7 +221,7 @@ Two parallel tracking systems:
 3. Register handler in `src/main/index.ts`
 4. Call from renderer via `window.electronAPI.<domain>.<method>()`
 
-Current IPC domains: `agent`, `session`, `appSettings`, `claudeSettings`, `fs`, `git`, `claudeCode`, `clipboard`, `tasks`, `dialog`, `logs`, `shortcuts`, `app`
+Current IPC domains: `agent`, `session`, `appSettings`, `claudeSettings`, `fs`, `git`, `claudeCode`, `clipboard`, `tasks`, `dialog`, `logs`, `shortcuts`, `app`, `chat`
 
 ### Adding a New Store
 
@@ -200,6 +244,11 @@ Hooks in `src/renderer/hooks/` encapsulate reusable logic:
 - `useSessionActions`: Session CRUD operations
 - `useClaudeSettings`: Claude API settings management
 - `useThemeEffects`: Theme change side effects
+- `useAppInitialization`: Load sessions, agents, subscribe to IPC events
+- `useSidebar`: Sidebar state management
+- `useSidebarKeyboardNav`: Keyboard navigation for sidebar
+- `useChatActions`: Chat creation, deletion, messaging
+- `useChatInitialization`: Chat IPC event listeners
 - `useCommandShortcuts`: Global shortcut command handling
 
 ## Build Configuration
@@ -235,14 +284,14 @@ Sent to renderer via `shortcut:command` IPC channel, handled by `useCommandShort
 - Uses `react-i18next` with namespace-based organization
 - Locales in `src/renderer/i18n/locales/<lang>/`
 - Supported languages: English (en), Russian (ru)
-- Namespaces: `app`, `common`, `settings`, `sidebar`, `terminal`, `dialogs`, `commands`, `agents`, `sessions`, `filebrowser`, `editor`
+- Namespaces: `app`, `common`, `settings`, `sidebar`, `terminal`, `dialogs`, `commands`, `agents`, `sessions`, `filebrowser`, `editor`, `chat`
 
 ## Debugging
 
 - **F12** opens DevTools in development mode
 - **DISABLE_GPU=1** environment variable disables hardware acceleration (useful if GPU crashes occur)
 - Main process logs go to terminal; renderer logs go to DevTools console
-- Agent PTY output is batched (100ms debounce) to prevent IPC flooding - check `AgentProcessManager` for details
+- Agent PTY output is batched (16ms debounce) to prevent IPC flooding - check `AgentProcessManager` for details
 - Common issues:
   - Terminal not rendering: Check if container has valid dimensions before XTerm initialization
   - Stale closures in callbacks: Use refs to store latest callback references (see TerminalView pattern)

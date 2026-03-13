@@ -11,7 +11,9 @@ import {
   GitBranch,
   Clock,
   GripVertical,
+  Trash2,
 } from "lucide-react";
+import { Button } from "@renderer/components/ui/button";
 import type { ClaudeTask, TaskPriority } from "@shared/types/claude-task";
 
 interface TaskItemProps {
@@ -21,6 +23,8 @@ interface TaskItemProps {
   isBlocked?: boolean;
   showDragHandle?: boolean;
   onClick?: () => void;
+  onDelete?: (taskId: string) => void;
+  onContextMenu?: (e: React.MouseEvent, taskId: string) => void;
 }
 
 const priorityConfig: Record<TaskPriority, { color: string; bg: string; label: string }> = {
@@ -77,17 +81,31 @@ export function TaskItem({
   isBlocked = false,
   showDragHandle = false,
   onClick,
+  onDelete,
+  onContextMenu,
 }: TaskItemProps) {
   const status = statusConfig[task.status] || statusConfig.pending;
   const StatusIcon = status.icon;
   const displayText =
     task.status === "in_progress" && task.activeForm ? task.activeForm : task.subject;
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu?.(e, task.id);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.(task.id);
+  };
+
   return (
     <div
       onClick={onClick}
+      onContextMenu={handleContextMenu}
       className={cn(
-        "flex items-start gap-2 py-1.5 px-2 rounded text-sm transition-all cursor-pointer",
+        "flex items-start gap-2 py-1.5 px-2 rounded text-sm transition-all cursor-pointer group",
         status.bg,
         isDragging && "opacity-50 shadow-lg scale-[1.02]",
         isSelected && "ring-2 ring-primary",
@@ -154,6 +172,19 @@ export function TaskItem({
           )}
         </div>
       </div>
+
+      {/* Delete button - shows on hover */}
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 shrink-0 group-hover:opacity-100 transition-opacity"
+          onClick={handleDelete}
+          title="Delete task"
+        >
+          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive transition-colors" />
+        </Button>
+      )}
 
       {/* Status badge */}
       <StatusBadge status={task.status} />

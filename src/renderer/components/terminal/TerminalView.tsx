@@ -1,4 +1,11 @@
-import React, { useEffect, useRef, useCallback, useState } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -10,6 +17,9 @@ import {
 } from "@xterm/addon-clipboard";
 import "@xterm/xterm/css/xterm.css";
 import { cn } from "@renderer/lib/utils";
+import { logger } from "@renderer/lib/logger";
+import { getTerminalTheme } from "@renderer/lib/terminal-theme";
+import { useEffectiveTheme } from "@renderer/stores/useSettingsStore";
 
 /**
  * Custom clipboard provider that uses Electron's clipboard API
@@ -46,31 +56,57 @@ interface TerminalViewProps {
   copyOnSelect?: boolean;
   rightClickPaste?: boolean;
   className?: string;
+  onSearchOpen?: () => void;
 }
 
-export function TerminalView({
-  agentId,
-  outputBuffer,
-  outputVersion,
-  onInput,
-  onResize,
-  fontSize = 14,
-  fontFamily = "JetBrains Mono, Menlo, Monaco, Courier New, monospace",
-  cursorStyle = "block",
-  cursorBlink = true,
-  copyOnSelect = false,
-  rightClickPaste = true,
-  className,
-}: TerminalViewProps) {
+export interface TerminalViewRef {
+  getSearchAddon: () => SearchAddon | null;
+  openSearch: () => void;
+}
+
+/**
+ * Get platform-specific default font family for terminal
+ * Windows: Cascadia Code (Windows Terminal default), Consolas fallback
+ * macOS/Linux: JetBrains Mono, Menlo, Monaco, Courier New fallback
+ */
+function getDefaultFontFamily(): string {
+  const platform = navigator.platform.toLowerCase();
+  if (platform.includes("win")) {
+    return "Cascadia Code, Consolas, Courier New, monospace";
+  }
+  // macOS and Linux
+  return "JetBrains Mono, Menlo, Monaco, Courier New, monospace";
+}
+
+export const TerminalView = forwardRef<TerminalViewRef, TerminalViewProps>(function TerminalView(
+  {
+    agentId,
+    outputBuffer,
+    outputVersion,
+    onInput,
+    onResize,
+    fontSize = 14,
+    fontFamily = getDefaultFontFamily(),
+    cursorStyle = "block",
+    cursorBlink = true,
+    copyOnSelect = false,
+    rightClickPaste = true,
+    className,
+    onSearchOpen,
+  },
+  ref
+) {
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
   const lastOutputVersionRef = useRef(0);
   const currentAgentIdRef = useRef<string | null>(null);
   const isDisposedRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [containerReady, setContainerReady] = useState(false);
   const fitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const effectiveTheme = useEffectiveTheme();
 
   // Keep refs updated to avoid stale closures in terminal callbacks
   const onInputRef = useRef(onInput);
@@ -98,6 +134,16 @@ export function TerminalView({
   useEffect(() => {
     copyOnSelectRef.current = copyOnSelect;
   }, [copyOnSelect]);
+
+  // Expose search functionality via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      getSearchAddon: () => searchAddonRef.current,
+      openSearch: () => onSearchOpen?.(),
+    }),
+    [onSearchOpen]
+  );
 
   // Safe fit function that checks if terminal is still valid
   const safeFit = useCallback(() => {
@@ -134,29 +180,7 @@ export function TerminalView({
       cursorStyle,
       fontSize,
       fontFamily,
-      theme: {
-        background: "#0a0a0a",
-        foreground: "#fafafa",
-        cursor: "#fafafa",
-        cursorAccent: "#0a0a0a",
-        selectionBackground: "rgba(250, 250, 250, 0.3)",
-        black: "#0a0a0a",
-        red: "#ff5f56",
-        green: "#27c93f",
-        yellow: "#ffbd2e",
-        blue: "#007aff",
-        magenta: "#af52de",
-        cyan: "#64d2ff",
-        white: "#fafafa",
-        brightBlack: "#6b6b6b",
-        brightRed: "#ff5f56",
-        brightGreen: "#27c93f",
-        brightYellow: "#ffbd2e",
-        brightBlue: "#007aff",
-        brightMagenta: "#af52de",
-        brightCyan: "#64d2ff",
-        brightWhite: "#fafafa",
-      },
+      theme: getTerminalTheme(effectiveTheme === "dark"),
       allowProposedApi: true,
     });
 
@@ -176,6 +200,7 @@ export function TerminalView({
 
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
+    searchAddonRef.current = searchAddon;
 
     // Handle input - use ref to avoid stale closure
     // PTY handles echo, no local echo needed (standard xterm.js + node-pty pattern)
@@ -218,6 +243,13 @@ export function TerminalView({
           }
         });
         return false; // Prevent default terminal handling
+      }
+
+      // Ctrl+F / Cmd+F = Open search
+      const isFindShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f";
+      if (isFindShortcut) {
+        onSearchOpen?.();
+        return false; // Prevent default browser find
       }
 
       return true; // Allow other keys to be processed
@@ -264,19 +296,20 @@ export function TerminalView({
 
       xtermRef.current = null;
       fitAddonRef.current = null;
+      searchAddonRef.current = null;
     };
   }, [containerReady]);
 
   // Handle agent switching and output buffer updates
-  // Only depend on agentId and outputVersion - use refs for buffer access
-  // to prevent unnecessary re-runs when buffer reference changes
+  // Depend on agentId, outputVersion, and containerReady
+  // containerReady ensures terminal is initialized before writing
   useEffect(() => {
     const terminal = xtermRef.current;
-    if (!terminal || isDisposedRef.current) return;
+    if (!terminal || isDisposedRef.current || !containerReady) return;
 
     const isAgentSwitch = currentAgentIdRef.current !== agentId;
 
-    console.log("[TERMINAL] useEffect triggered:", {
+    logger.debug("[TERMINAL] useEffect triggered:", {
       agentId: agentId.slice(0, 8),
       isAgentSwitch,
       outputVersion,
@@ -303,7 +336,7 @@ export function TerminalView({
       const newData = buffer.slice(startIndex);
       const combinedData = newData.join("");
 
-      console.log(
+      logger.debug(
         "[TERMINAL] write:",
         agentId.slice(0, 8),
         "version:",
@@ -358,7 +391,7 @@ export function TerminalView({
         safeFit();
       });
     }
-  }, [agentId, outputVersion, safeFit]);
+  }, [agentId, outputVersion, containerReady, safeFit]);
 
   // Update terminal settings
   useEffect(() => {
@@ -371,18 +404,32 @@ export function TerminalView({
     }
   }, [fontSize, fontFamily, cursorStyle, cursorBlink, safeFit]);
 
+  // Update terminal theme when effective theme changes
+  useEffect(() => {
+    if (xtermRef.current && !isDisposedRef.current) {
+      xtermRef.current.options.theme = getTerminalTheme(effectiveTheme === "dark");
+    }
+  }, [effectiveTheme]);
+
   // Refit terminal when container ref changes
   const containerRef = useCallback((node: HTMLDivElement | null) => {
+    console.log("[TerminalView] containerRef called, node:", !!node);
     if (node) {
       terminalRef.current = node;
+      console.log("[TerminalView] container dimensions:", node.offsetWidth, "x", node.offsetHeight);
       // Check if container has actual dimensions
       if (node.offsetWidth > 0 && node.offsetHeight > 0) {
+        console.log("[TerminalView] setting containerReady to true");
         setContainerReady(true);
       } else {
         // Retry after layout
+        console.log("[TerminalView] no dimensions, retrying with requestAnimationFrame");
         requestAnimationFrame(() => {
           if (terminalRef.current?.offsetWidth && terminalRef.current?.offsetHeight) {
+            console.log("[TerminalView] retry successful, setting containerReady to true");
             setContainerReady(true);
+          } else {
+            console.log("[TerminalView] retry failed, dimensions still 0");
           }
         });
       }
@@ -427,7 +474,7 @@ export function TerminalView({
       <div ref={containerRef} className="h-full w-full" />
     </div>
   );
-}
+});
 
 // Hook for managing terminal lifecycle with agent
 export function useTerminalManager(agentId: string | null) {

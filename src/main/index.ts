@@ -10,12 +10,16 @@ import { registerGitHandlers } from "./ipc/gitHandlers";
 import { registerClaudeCodeIpcHandlers } from "./ipc/claudeCodeHandlers";
 import { registerClipboardHandlers } from "./ipc/clipboardHandlers";
 import { registerTaskHandlers } from "./ipc/taskHandlers";
+import { registerChatHandlers } from "./ipc/chatHandlers";
 import { appSettingsManager } from "./services/AppSettingsManager";
+import { chatAgentManager } from "./services/ChatAgentManager";
 import { trayManager } from "./services/TrayManager";
 import { autoLaunchManager } from "./services/AutoLaunchManager";
 import { gitService } from "./services/GitService";
 import { hookScriptsManager } from "./services/HookScripts";
 import { claudeTaskService } from "./services/ClaudeTaskService";
+import { historyCleanupService } from "./services/HistoryCleanupService";
+import { notificationService } from "./services/NotificationService";
 
 // Error handling for main process
 process.on("uncaughtException", (error) => {
@@ -42,6 +46,7 @@ registerGitHandlers();
 registerClaudeCodeIpcHandlers();
 registerClipboardHandlers();
 registerTaskHandlers();
+registerChatHandlers();
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -80,6 +85,12 @@ function createWindow(): void {
 
   // Set main window for task service
   claudeTaskService.setMainWindow(mainWindow);
+
+  // Set main window for chat agent manager
+  chatAgentManager.setMainWindow(mainWindow);
+
+  // Set main window for notification service
+  notificationService.setMainWindow(mainWindow);
 
   // Set up settings change notifications
   setupSettingsNotifications(mainWindow);
@@ -141,27 +152,37 @@ function createWindow(): void {
   }
 }
 
-// Global shortcuts for slash commands
+// Map shortcut IDs to commands
+const SHORTCUT_COMMAND_MAP: Record<string, string> = {
+  commit: "/commit",
+  "review-pr": "/review-pr",
+  help: "/help",
+  clear: "/clear",
+};
+
+// Global shortcuts for slash commands (dynamic based on settings)
 function registerGlobalShortcuts(): void {
-  // Ctrl/Cmd + Shift + C = /commit
-  globalShortcut.register("CommandOrControl+Shift+C", () => {
-    mainWindow?.webContents.send("shortcut:command", "/commit");
-  });
+  // Unregister all existing shortcuts
+  globalShortcut.unregisterAll();
 
-  // Ctrl/Cmd + Shift + R = /review-pr
-  globalShortcut.register("CommandOrControl+Shift+R", () => {
-    mainWindow?.webContents.send("shortcut:command", "/review-pr");
-  });
+  const shortcuts = appSettingsManager.getShortcuts();
 
-  // Ctrl/Cmd + Shift + H = /help
-  globalShortcut.register("CommandOrControl+Shift+H", () => {
-    mainWindow?.webContents.send("shortcut:command", "/help");
-  });
-
-  // Ctrl/Cmd + Shift + L = /clear
-  globalShortcut.register("CommandOrControl+Shift+L", () => {
-    mainWindow?.webContents.send("shortcut:command", "/clear");
-  });
+  for (const [id, shortcut] of Object.entries(shortcuts.shortcuts)) {
+    // Only register global shortcuts with valid accelerators
+    if (shortcut.category === "global" && shortcut.accelerator) {
+      try {
+        globalShortcut.register(shortcut.accelerator, () => {
+          const command = SHORTCUT_COMMAND_MAP[id];
+          if (command) {
+            mainWindow?.webContents.send("shortcut:command", command);
+          }
+        });
+        console.log(`[Main] Registered shortcut: ${id} -> ${shortcut.accelerator}`);
+      } catch (error) {
+        console.error(`[Main] Failed to register shortcut ${id}:`, error);
+      }
+    }
+  }
 }
 
 function unregisterGlobalShortcuts(): void {
@@ -187,6 +208,11 @@ appSettingsManager.on("auto-start-changed", async (enabled: boolean) => {
   } else {
     await autoLaunchManager.disable();
   }
+});
+
+// Listen for shortcut settings changes
+appSettingsManager.on("shortcuts-changed", () => {
+  registerGlobalShortcuts();
 });
 
 // App lifecycle
@@ -219,6 +245,9 @@ app.whenReady().then(() => {
   // Sync auto-launch setting
   syncAutoLaunchSetting();
 
+  // Start history cleanup service
+  historyCleanupService.start();
+
   app.on("activate", () => {
     // On macOS, re-create window when dock icon is clicked
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -245,6 +274,8 @@ app.on("before-quit", () => {
   agentProcessManager.cleanup();
   gitService.stopAllWatching();
   claudeTaskService.stopAllWatching();
+  chatAgentManager.cleanup();
+  historyCleanupService.stop();
   trayManager.destroy();
 });
 

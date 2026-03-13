@@ -14,23 +14,29 @@ import {
   RefreshCw,
   AlertTriangle,
   Folder,
+  ListTodo,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { Button } from "@renderer/components/ui/button";
+import { useConfirm } from "@renderer/components/ui/alert-dialog";
 import { useClaudeTaskStore, taskActions } from "@renderer/stores/useClaudeTaskStore";
 import { TaskItem } from "./TaskItem";
 import { TaskExportDialog } from "./TaskExportDialog";
 import { TaskDependencyGraph } from "./TaskDependencyGraph";
+import { TaskContextMenuTrigger } from "./TaskContextMenu";
 import type { TaskEvent, ClaudeTask } from "@shared/types/claude-task";
 
 interface GlobalTasksPanelProps {
   className?: string;
+  searchQuery?: string;
 }
 
-export function GlobalTasksPanel({ className }: GlobalTasksPanelProps) {
+export function GlobalTasksPanel({ className, searchQuery: _searchQuery }: GlobalTasksPanelProps) {
   const { t } = useTranslation("terminal");
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [confirm, ConfirmDialog] = useConfirm();
 
   // Get all tasks (no sessionId filter)
   const allTasks = useClaudeTaskStore((state) => state.tasks);
@@ -66,7 +72,6 @@ export function GlobalTasksPanel({ className }: GlobalTasksPanelProps) {
 
   // Load tasks on mount and start watching
   useEffect(() => {
-    // Load all tasks (no sessionId)
     taskActions.loadTasks(undefined);
     taskActions.startWatching(undefined);
 
@@ -95,11 +100,51 @@ export function GlobalTasksPanel({ className }: GlobalTasksPanelProps) {
     [selectedTaskId, setSelectedTask]
   );
 
+  // Handle single task deletion
+  const handleDeleteTask = useCallback(
+    async (taskId: string) => {
+      const confirmed = await confirm({
+        title: t("tasks.delete.title", "Delete Task"),
+        description: t(
+          "tasks.delete.description",
+          "Are you sure you want to delete this task? This action cannot be undone."
+        ),
+        confirmLabel: t("tasks.delete.confirm", "Delete"),
+        cancelLabel: t("tasks.delete.cancel", "Cancel"),
+        destructive: true,
+      });
+
+      if (confirmed) {
+        const task = allTasks.find((t) => t.id === taskId);
+        await taskActions.deleteTask(task?.sessionName, taskId);
+      }
+    },
+    [confirm, t, allTasks]
+  );
+
+  // Handle clear all tasks
+  const handleClearAll = useCallback(async () => {
+    const confirmed = await confirm({
+      title: t("tasks.clearAll.title", "Clear All Tasks"),
+      description: t(
+        "tasks.clearAll.description",
+        "Are you sure you want to delete all tasks? This action cannot be undone."
+      ),
+      confirmLabel: t("tasks.clearAll.confirm", "Clear All"),
+      cancelLabel: t("tasks.clearAll.cancel", "Cancel"),
+      destructive: true,
+    });
+
+    if (confirmed) {
+      await taskActions.deleteAllTasks(undefined);
+    }
+  }, [confirm, t]);
+
   // Group tasks by session/team
   const tasksBySession = tasks.reduce(
     (acc, task) => {
-      // Extract session from task metadata or use 'default'
-      const session = (task.metadata?.teamName as string) || "default";
+      // Use sessionName field set during task loading
+      const session = task.sessionName || "default";
       if (!acc[session]) {
         acc[session] = [];
       }
@@ -176,6 +221,20 @@ export function GlobalTasksPanel({ className }: GlobalTasksPanelProps) {
           </div>
 
           <div className="flex items-center gap-1">
+            {/* Clear All button */}
+            {tasks.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={handleClearAll}
+                disabled={loading}
+                title={t("tasks.clearAll.tooltip", "Clear all tasks")}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
             {/* Refresh button */}
             <Button
               variant="ghost"
@@ -230,8 +289,16 @@ export function GlobalTasksPanel({ className }: GlobalTasksPanelProps) {
                   {t("tasks.loading", "Loading tasks...")}
                 </div>
               ) : Object.keys(tasksBySession).length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-sm">
-                  {t("tasks.noTasks", "No tasks found")}
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 bg-muted/5 py-8">
+                  <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-muted/30">
+                    <ListTodo className="h-5 w-5 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {t("tasks.noTasks", "No tasks found")}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground/60">
+                    {t("tasks.noTasksHint", "Tasks will appear here when agents are working")}
+                  </p>
                 </div>
               ) : (
                 Object.entries(tasksBySession).map(([session, sessionTasks]) => (
@@ -242,6 +309,7 @@ export function GlobalTasksPanel({ className }: GlobalTasksPanelProps) {
                     selectedTaskId={selectedTaskId}
                     blockedTaskIds={new Set(blockedTasks.map((t) => t.id))}
                     onTaskSelect={handleTaskSelect}
+                    onDeleteTask={handleDeleteTask}
                   />
                 ))
               )}
@@ -263,6 +331,9 @@ export function GlobalTasksPanel({ className }: GlobalTasksPanelProps) {
         onOpenChange={setShowExportDialog}
         sessionId={undefined}
       />
+
+      {/* Confirm dialog */}
+      <ConfirmDialog />
     </div>
   );
 }
@@ -276,6 +347,7 @@ interface SessionTaskGroupProps {
   selectedTaskId: string | null;
   blockedTaskIds: Set<string>;
   onTaskSelect: (taskId: string) => void;
+  onDeleteTask: (taskId: string) => void;
 }
 
 function SessionTaskGroup({
@@ -284,10 +356,17 @@ function SessionTaskGroup({
   selectedTaskId,
   blockedTaskIds,
   onTaskSelect,
+  onDeleteTask,
 }: SessionTaskGroupProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const completedCount = tasks.filter((t) => t.status === "completed").length;
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, _taskId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Context menu deletion is handled by TaskContextMenuTrigger
+  }, []);
 
   return (
     <div className="border rounded-md overflow-hidden">
@@ -313,14 +392,22 @@ function SessionTaskGroup({
       {/* Task list */}
       {!isCollapsed && (
         <div className="space-y-0.5 p-1">
-          {tasks.map((task) => (
-            <TaskItem
-              key={task.id}
+          {tasks.map((task, index) => (
+            <TaskContextMenuTrigger
+              key={`${sessionName}-${task.id}-${index}-ctx`}
               task={task}
-              isSelected={selectedTaskId === task.id}
-              isBlocked={blockedTaskIds.has(task.id)}
-              onClick={() => onTaskSelect(task.id)}
-            />
+              onDelete={onDeleteTask}
+              onViewDetails={(taskId) => onTaskSelect(taskId)}
+            >
+              <TaskItem
+                task={task}
+                isSelected={selectedTaskId === task.id}
+                isBlocked={blockedTaskIds.has(task.id)}
+                onClick={() => onTaskSelect(task.id)}
+                onDelete={onDeleteTask}
+                onContextMenu={handleContextMenu}
+              />
+            </TaskContextMenuTrigger>
           ))}
         </div>
       )}

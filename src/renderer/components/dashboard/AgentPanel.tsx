@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Terminal, FolderCode, Sparkles } from "lucide-react";
+import { Terminal, FolderCode, Sparkles, Search } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import type { Agent } from "@renderer/stores/useAgentStore";
 
@@ -228,6 +228,7 @@ interface AgentGridProps {
   onSelectAgent: (agentId: string) => void;
   onKillAgent: (agentId: string) => void;
   compactMode?: boolean;
+  searchQuery?: string;
 }
 
 export function AgentGrid({
@@ -236,8 +237,30 @@ export function AgentGrid({
   onSelectAgent,
   onKillAgent,
   compactMode = false,
+  searchQuery = "",
 }: AgentGridProps) {
   const { t } = useTranslation("agents");
+
+  // Show "no results" state when searching but no matches
+  if (agents.length === 0 && searchQuery.trim()) {
+    if (compactMode) {
+      return (
+        <div className="flex flex-col items-center justify-center py-4">
+          <Search className="h-4 w-4 text-muted-foreground/40" />
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 bg-muted/5 py-8">
+        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-muted/30">
+          <Search className="h-5 w-5 text-muted-foreground/40" />
+        </div>
+        <p className="text-xs font-medium text-muted-foreground">
+          {t("noSearchResults", "No agents match your search")}
+        </p>
+      </div>
+    );
+  }
 
   if (agents.length === 0) {
     if (compactMode) {

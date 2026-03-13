@@ -28,6 +28,15 @@ export interface AgentInfo {
   status: "starting" | "running" | "idle" | "error" | "exited";
   createdAt: Date;
   lastActivity: Date;
+  claudeSessionId?: string; // Claude CLI session ID for resume functionality
+}
+
+// Options for creating a new agent
+export interface CreateAgentOptions {
+  sessionId: string;
+  workingDirectory: string;
+  env?: Record<string, string>;
+  resumeSessionId?: string; // Optional Claude session ID to resume
 }
 
 export interface OutputEvent {

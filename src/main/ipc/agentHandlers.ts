@@ -7,6 +7,7 @@ const createAgentSchema = z.object({
   sessionId: z.string().min(1),
   workingDirectory: z.string().min(1),
   env: z.record(z.string()).optional(),
+  resumeSessionId: z.string().optional(), // Optional Claude session ID to resume
 });
 
 const writeAgentSchema = z.object({
@@ -44,6 +45,7 @@ export function registerAgentHandlers(): void {
         status: agent.status,
         createdAt: agent.createdAt,
         lastActivity: agent.lastActivity,
+        claudeSessionId: agent.claudeSessionId,
       };
     } catch (error) {
       console.error("Failed to create agent:", error);
@@ -98,6 +100,7 @@ export function registerAgentHandlers(): void {
         status: agent.status,
         createdAt: agent.createdAt,
         lastActivity: agent.lastActivity,
+        claudeSessionId: agent.claudeSessionId,
       };
     } catch (error) {
       console.error("Failed to get agent:", error);
@@ -115,6 +118,7 @@ export function registerAgentHandlers(): void {
       status: agent.status,
       createdAt: agent.createdAt,
       lastActivity: agent.lastActivity,
+      claudeSessionId: agent.claudeSessionId,
     }));
   });
 
@@ -128,6 +132,7 @@ export function registerAgentHandlers(): void {
       status: agent.status,
       createdAt: agent.createdAt,
       lastActivity: agent.lastActivity,
+      claudeSessionId: agent.claudeSessionId,
     }));
   });
 
@@ -149,6 +154,27 @@ export function registerAgentHandlers(): void {
       agentProcessManager.setActiveAgent(agentId);
     } catch (error) {
       console.error("Failed to set active agent:", error);
+    }
+  });
+
+  // Get the last agent with a Claude session ID for resumable sessions
+  ipcMain.handle("agent:get-resumable", async (_event, sessionId: string) => {
+    try {
+      const agent = agentProcessManager.getLastAgentWithClaudeSession(sessionId);
+      if (!agent) return null;
+
+      return {
+        id: agent.id,
+        sessionId: agent.sessionId,
+        workingDirectory: agent.workingDirectory,
+        status: agent.status,
+        createdAt: agent.createdAt,
+        lastActivity: agent.lastActivity,
+        claudeSessionId: agent.claudeSessionId,
+      };
+    } catch (error) {
+      console.error("Failed to get resumable agent:", error);
+      throw error;
     }
   });
 }

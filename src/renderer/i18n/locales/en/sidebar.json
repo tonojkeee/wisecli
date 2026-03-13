@@ -1,11 +1,86 @@
 {
+  "sections": {
+    "files": "Files",
+    "agents": "Agents",
+    "chats": "Chats",
+    "tasks": "Tasks"
+  },
+  "settings": "Settings",
+  "search": {
+    "placeholder": "Search...",
+    "sessions": "Search sessions...",
+    "files": "Search files...",
+    "agents": "Search agents...",
+    "chats": "Search chats...",
+    "tasks": "Search tasks...",
+    "sessionsAndAgents": "Search sessions & agents...",
+    "clear": "Clear search"
+  },
+  "accordion": {
+    "expandSession": "Expand session",
+    "collapseSession": "Collapse session"
+  },
+  "sessionCount": "sessions",
+  "agentCount": "agents",
+  "current": "current",
+  "openFiles": "open",
+  "running": "running",
+  "pendingTasks": "pending",
+  "chatCount": "chats",
+  "streaming": "streaming",
+  "sessionActions": "Session actions",
+  "noResults": "No results found",
+  "noSessions": "No sessions yet",
+  "createFirst": "Create your first session",
+  "empty": {
+    "sessions": {
+      "title": "No sessions yet",
+      "description": "Create your first session to get started",
+      "action": "Create Session"
+    },
+    "agents": {
+      "title": "No agents running",
+      "description": "Start an agent to begin working",
+      "action": "Start Agent"
+    },
+    "files": {
+      "emptyFolder": "Empty folder",
+      "noResults": "No files found matching your search"
+    },
+    "tasks": {
+      "title": "No tasks tracked",
+      "description": "Tasks will appear here when agents are working"
+    },
+    "chats": {
+      "title": "No chats yet",
+      "description": "Start a chat to begin a conversation",
+      "action": "New Chat"
+    },
+    "search": {
+      "noResults": "No results found"
+    }
+  },
+  "shortcuts": {
+    "switchSection": "Switch section (1-3)",
+    "search": "Focus search (⌘P)",
+    "toggle": "Toggle sidebar (⌘B)",
+    "navigate": "Navigate (↑/↓)",
+    "select": "Select (Enter)",
+    "delete": "Delete (⌫)",
+    "rename": "Rename (F2)"
+  },
   "navigation": {
     "appearance": "Appearance",
     "terminal": "Terminal",
+    "glm5": "GLM-5 Chat",
     "behavior": "Behavior",
     "shortcuts": "Shortcuts",
     "notifications": "Notifications",
     "privacy": "Privacy",
     "advanced": "Advanced"
-  }
+  },
+  "contextUsage": "ctx",
+  "connecting": "connecting...",
+  "expandSidebar": "Expand sidebar",
+  "collapseSidebar": "Collapse sidebar"
 }

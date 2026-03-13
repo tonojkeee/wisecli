@@ -7,7 +7,7 @@
 
 import { useClaudeCodeStatus } from "@renderer/stores/useClaudeCodeStore";
 import { cn } from "@renderer/lib/utils";
-import { Wifi, Loader2 } from "lucide-react";
+import { Wifi, WifiOff, Loader2 } from "lucide-react";
 
 interface ClaudeConnectionIndicatorProps {
   className?: string;
@@ -16,29 +16,46 @@ interface ClaudeConnectionIndicatorProps {
 export function ClaudeConnectionIndicator({ className }: ClaudeConnectionIndicatorProps) {
   const status = useClaudeCodeStatus();
 
-  if (status === "disconnected") {
-    return null; // Don't show when disconnected
-  }
-
   return (
     <div
       className={cn(
         "flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium",
-        status === "connected" && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-        status === "connecting" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+        status === "connected" && "bg-status-success/10 text-status-success",
+        status === "connecting" && "bg-status-warning/10 text-status-warning",
+        status === "disconnected" && "bg-status-error/10 text-status-error",
         className
       )}
-      title={status === "connected" ? "Claude Code Connected" : "Connecting to Claude Code..."}
+      title={
+        status === "connected"
+          ? "Claude Code Connected"
+          : status === "connecting"
+            ? "Connecting to Claude Code..."
+            : "Claude Code Disconnected"
+      }
+      role="status"
+      aria-live="polite"
+      aria-label={
+        status === "connected"
+          ? "Claude Code connected"
+          : status === "connecting"
+            ? "Connecting to Claude Code"
+            : "Claude Code disconnected"
+      }
     >
       {status === "connected" ? (
         <>
           <Wifi className="h-3 w-3" />
           <span>Claude</span>
         </>
-      ) : (
+      ) : status === "connecting" ? (
         <>
           <Loader2 className="h-3 w-3 animate-spin" />
           <span>Connecting...</span>
+        </>
+      ) : (
+        <>
+          <WifiOff className="h-3 w-3" />
+          <span>Offline</span>
         </>
       )}
     </div>

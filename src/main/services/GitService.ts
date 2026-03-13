@@ -1,6 +1,6 @@
 import { BrowserWindow } from "electron";
 import { spawn } from "child_process";
-import { join } from "path";
+import { join, relative } from "path";
 import { existsSync, watch, FSWatcher } from "fs";
 import { debug } from "../utils/debug.js";
 
@@ -408,10 +408,9 @@ class GitService {
     ref: string = "HEAD"
   ): Promise<string | null> {
     try {
-      // Get the relative path from repo root
-      const relativePath = filePath.startsWith(repoPath)
-        ? filePath.slice(repoPath.length + 1)
-        : filePath;
+      // Get the relative path from repo root using relative() for cross-platform support
+      // This handles both forward slashes and backslashes correctly
+      const relativePath = relative(repoPath, filePath);
 
       // Validate ref to prevent injection
       if (!isValidGitRef(ref)) {

@@ -84,4 +84,37 @@ export function registerTaskHandlers(): void {
       }
     }
   );
+
+  // Delete a specific task
+  ipcMain.handle(
+    "tasks:delete",
+    async (
+      _event,
+      sessionId: string | undefined,
+      taskId: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        return await claudeTaskService.deleteTask(sessionId, taskId);
+      } catch (error) {
+        console.error("[taskHandlers] Failed to delete task:", error);
+        throw error;
+      }
+    }
+  );
+
+  // Delete all tasks for a session
+  ipcMain.handle(
+    "tasks:delete-all",
+    async (
+      _event,
+      sessionId: string | undefined
+    ): Promise<{ success: boolean; error?: string; deletedCount?: number }> => {
+      try {
+        return await claudeTaskService.deleteAllTasks(sessionId);
+      } catch (error) {
+        console.error("[taskHandlers] Failed to delete all tasks:", error);
+        throw error;
+      }
+    }
+  );
 }

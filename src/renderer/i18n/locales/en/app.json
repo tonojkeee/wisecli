@@ -1,6 +1,7 @@
 {
   "title": "WiseCLI",
   "subtitle": "Desktop GUI for Claude CLI",
+  "skipToContent": "Skip to main content",
   "header": {
     "appSettings": "App Settings",
     "claudeApiSettings": "Claude API Settings",

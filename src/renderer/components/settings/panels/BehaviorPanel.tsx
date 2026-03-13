@@ -1,28 +1,21 @@
-import React from 'react'
-import { useTranslation } from 'react-i18next'
-import { SettingRow, SettingGroup, SettingToggle, SettingSelect } from '../components'
-import { useSettingsStore, useBehaviorSettings } from '@renderer/stores/useSettingsStore'
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { SettingRow, SettingGroup, SettingToggle, SettingSelect } from "../components";
+import { useSettingsStore, useBehaviorSettings } from "@renderer/stores/useSettingsStore";
 
 export function BehaviorPanel() {
-  const { t } = useTranslation('settings')
-  const updateBehavior = useSettingsStore((state) => state.updateBehavior)
-  const behavior = useBehaviorSettings()
+  const { t } = useTranslation("settings");
+  const updateBehavior = useSettingsStore((state) => state.updateBehavior);
+  const behavior = useBehaviorSettings();
 
-  if (!behavior) return null
+  if (!behavior) return null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold">{t('panels.behavior.title')}</h3>
-        <p className="text-sm text-muted-foreground">
-          {t('panels.behavior.description')}
-        </p>
-      </div>
-
-      <SettingGroup title={t('panels.behavior.startup.title')}>
+    <div className="space-y-4">
+      <SettingGroup title={t("panels.behavior.startup.title")}>
         <SettingRow
-          label={t('panels.behavior.startup.launchAtLogin')}
-          description={t('panels.behavior.startup.launchAtLoginDesc')}
+          label={t("panels.behavior.startup.launchAtLogin")}
+          description={t("panels.behavior.startup.launchAtLoginDesc")}
         >
           <SettingToggle
             checked={behavior.autoStart}
@@ -31,8 +24,8 @@ export function BehaviorPanel() {
         </SettingRow>
 
         <SettingRow
-          label={t('panels.behavior.startup.restoreSession')}
-          description={t('panels.behavior.startup.restoreSessionDesc')}
+          label={t("panels.behavior.startup.restoreSession")}
+          description={t("panels.behavior.startup.restoreSessionDesc")}
         >
           <SettingToggle
             checked={behavior.restoreSession}
@@ -41,10 +34,10 @@ export function BehaviorPanel() {
         </SettingRow>
       </SettingGroup>
 
-      <SettingGroup title={t('panels.behavior.window.title')}>
+      <SettingGroup title={t("panels.behavior.window.title")}>
         <SettingRow
-          label={t('panels.behavior.window.minimizeToTray')}
-          description={t('panels.behavior.window.minimizeToTrayDesc')}
+          label={t("panels.behavior.window.minimizeToTray")}
+          description={t("panels.behavior.window.minimizeToTrayDesc")}
         >
           <SettingToggle
             checked={behavior.minimizeToTray}
@@ -53,20 +46,25 @@ export function BehaviorPanel() {
         </SettingRow>
 
         <SettingRow
-          label={t('panels.behavior.window.closeBehavior')}
-          description={t('panels.behavior.window.closeBehaviorDesc')}
+          label={t("panels.behavior.window.closeBehavior")}
+          description={t("panels.behavior.window.closeBehaviorDesc")}
         >
           <SettingSelect
             value={behavior.closeBehavior}
-            onChange={(value) => updateBehavior({ closeBehavior: value as 'quit' | 'minimize-to-tray' | 'ask' })}
+            onChange={(value) =>
+              updateBehavior({ closeBehavior: value as "quit" | "minimize-to-tray" | "ask" })
+            }
             options={[
-              { value: 'quit', label: t('panels.behavior.window.quitApplication') },
-              { value: 'minimize-to-tray', label: t('panels.behavior.window.minimizeToTrayOption') },
-              { value: 'ask', label: t('panels.behavior.window.askEveryTime') }
+              { value: "quit", label: t("panels.behavior.window.quitApplication") },
+              {
+                value: "minimize-to-tray",
+                label: t("panels.behavior.window.minimizeToTrayOption"),
+              },
+              { value: "ask", label: t("panels.behavior.window.askEveryTime") },
             ]}
           />
         </SettingRow>
       </SettingGroup>
     </div>
-  )
+  );
 }

@@ -27,12 +27,7 @@ export function AdvancedPanel() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold">{t("panels.advanced.title")}</h3>
-        <p className="text-sm text-muted-foreground">{t("panels.advanced.description")}</p>
-      </div>
-
+    <div className="space-y-4">
       <SettingGroup title={t("panels.advanced.proxy.title")}>
         <SettingRow
           label={t("panels.advanced.proxy.enableProxy")}

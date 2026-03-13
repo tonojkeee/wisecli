@@ -57,7 +57,10 @@ export class ClaudeTaskService extends EventEmitter {
     try {
       if (sessionId) {
         // Read tasks from specific session
-        const sessionTasks = await this.readTasksFromDirectory(this.getSessionTasksPath(sessionId));
+        const sessionTasks = await this.readTasksFromDirectory(
+          this.getSessionTasksPath(sessionId),
+          sessionId
+        );
         tasks.push(...sessionTasks);
       } else {
         // Read tasks from all sessions
@@ -67,7 +70,8 @@ export class ClaudeTaskService extends EventEmitter {
           for (const session of sessions) {
             if (session.isDirectory()) {
               const sessionTasks = await this.readTasksFromDirectory(
-                path.join(basePath, session.name)
+                path.join(basePath, session.name),
+                session.name
               );
               tasks.push(...sessionTasks);
             }
@@ -92,8 +96,13 @@ export class ClaudeTaskService extends EventEmitter {
 
   /**
    * Read tasks from a specific directory
+   * @param dirPath - Path to the directory containing task files
+   * @param sessionName - Optional session name to attach to each task (used for deletion)
    */
-  private async readTasksFromDirectory(dirPath: string): Promise<ClaudeTask[]> {
+  private async readTasksFromDirectory(
+    dirPath: string,
+    sessionName?: string
+  ): Promise<ClaudeTask[]> {
     const tasks: ClaudeTask[] = [];
 
     if (!fs.existsSync(dirPath)) {
@@ -111,6 +120,10 @@ export class ClaudeTaskService extends EventEmitter {
             // Ensure task has an id (use filename without extension as fallback)
             if (!task.id) {
               task.id = file.replace(".json", "");
+            }
+            // Store the session name so we can find the task file later for deletion
+            if (sessionName) {
+              task.sessionName = sessionName;
             }
             tasks.push(task);
           } catch (parseError) {
@@ -506,6 +519,96 @@ export class ClaudeTaskService extends EventEmitter {
     };
 
     return pretty ? JSON.stringify(exportData, null, 2) : JSON.stringify(exportData);
+  }
+
+  /**
+   * Delete a specific task file
+   */
+  async deleteTask(
+    sessionId: string | undefined,
+    taskId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const basePath = this.getSessionTasksPath(sessionId);
+      const taskFile = path.join(basePath, `${taskId}.json`);
+
+      if (!fs.existsSync(taskFile)) {
+        return { success: false, error: `Task file not found: ${taskId}` };
+      }
+
+      fs.unlinkSync(taskFile);
+
+      // Notify renderer of the change
+      await this.notifyRenderer(sessionId);
+
+      return { success: true };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      debug.error(`[ClaudeTaskService] Failed to delete task ${taskId}:`, error);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * Delete all tasks for a session (or all sessions if sessionId is undefined)
+   */
+  async deleteAllTasks(
+    sessionId: string | undefined
+  ): Promise<{ success: boolean; error?: string; deletedCount?: number }> {
+    try {
+      let deletedCount = 0;
+
+      if (sessionId) {
+        // Delete tasks from specific session
+        const sessionPath = this.getSessionTasksPath(sessionId);
+        if (fs.existsSync(sessionPath)) {
+          const files = fs.readdirSync(sessionPath);
+          for (const file of files) {
+            if (file.endsWith(".json")) {
+              const filePath = path.join(sessionPath, file);
+              try {
+                fs.unlinkSync(filePath);
+                deletedCount++;
+              } catch (err) {
+                debug.warn(`[ClaudeTaskService] Failed to delete ${file}:`, err);
+              }
+            }
+          }
+        }
+      } else {
+        // Delete tasks from ALL sessions (iterate through subdirectories)
+        const basePath = this.getTasksBasePath();
+        if (fs.existsSync(basePath)) {
+          const sessions = fs.readdirSync(basePath, { withFileTypes: true });
+          for (const session of sessions) {
+            if (session.isDirectory()) {
+              const sessionPath = path.join(basePath, session.name);
+              const files = fs.readdirSync(sessionPath);
+              for (const file of files) {
+                if (file.endsWith(".json")) {
+                  const filePath = path.join(sessionPath, file);
+                  try {
+                    fs.unlinkSync(filePath);
+                    deletedCount++;
+                  } catch (err) {
+                    debug.warn(`[ClaudeTaskService] Failed to delete ${file}:`, err);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Notify renderer of the change
+      await this.notifyRenderer(sessionId);
+
+      return { success: true, deletedCount };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      debug.error(`[ClaudeTaskService] Failed to delete all tasks:`, error);
+      return { success: false, error: errorMsg };
+    }
   }
 
   /**

@@ -8,22 +8,34 @@ import { todoParser } from "./TodoParser.js";
 import { claudeCodeServer } from "./ClaudeCodeServer.js";
 import { claudeHooksServer } from "./ClaudeHooksServer.js";
 import { hookScriptsManager } from "./HookScripts.js";
+import { notificationService } from "./NotificationService.js";
 import { RingBuffer } from "@shared/utils/RingBuffer";
 import { debug } from "../utils/debug.js";
 
 const require = createRequire(import.meta.url);
 const pty = require("node-pty") as typeof Pty;
 
+// Platform detection for cross-platform support
+const isWindows = process.platform === "win32";
+
 // Dangerous environment variables that should never be passed from user input
-const DANGEROUS_ENV_VARS = [
+// Unix-specific dangerous env vars
+const DANGEROUS_ENV_VARS_UNIX = [
   "LD_PRELOAD",
   "LD_LIBRARY_PATH",
   "DYLD_INSERT_LIBRARIES",
   "DYLD_LIBRARY_PATH",
+];
+// Common dangerous env vars (affect all platforms)
+const DANGEROUS_ENV_VARS_COMMON = [
   "NODE_OPTIONS",
   "ELECTRON_RUN_AS_NODE",
   "ELECTRON_ENABLE_LOGGING",
 ];
+// Combined list based on platform
+const DANGEROUS_ENV_VARS = isWindows
+  ? DANGEROUS_ENV_VARS_COMMON
+  : [...DANGEROUS_ENV_VARS_UNIX, ...DANGEROUS_ENV_VARS_COMMON];
 
 /**
  * Sanitize environment variables to prevent injection of dangerous values
@@ -49,12 +61,14 @@ export interface Agent {
   status: "starting" | "running" | "idle" | "error" | "exited";
   createdAt: Date;
   lastActivity: Date;
+  claudeSessionId?: string; // Claude CLI session ID for resume functionality
 }
 
 export interface CreateAgentOptions {
   sessionId: string;
   workingDirectory: string;
   env?: Record<string, string>;
+  resumeSessionId?: string; // Optional Claude session ID to resume
 }
 
 class AgentProcessManager extends EventEmitter {
@@ -79,7 +93,7 @@ class AgentProcessManager extends EventEmitter {
   }
 
   async createAgent(options: CreateAgentOptions): Promise<Agent> {
-    const { sessionId, workingDirectory, env = {} } = options;
+    const { sessionId, workingDirectory, env = {}, resumeSessionId } = options;
     const agentId = uuidv4();
 
     // Initialize output buffer with RingBuffer for O(1) operations
@@ -96,7 +110,7 @@ class AgentProcessManager extends EventEmitter {
       }
 
       try {
-        await hookScriptsManager.ensureInstalled();
+        await hookScriptsManager.ensureInstall();
       } catch (err) {
         debug.error("[AgentProcessManager] Hook scripts install failed:", err);
         // Continue without hook scripts
@@ -136,7 +150,18 @@ class AgentProcessManager extends EventEmitter {
 
     // Create PTY process with git context and IDE integration in environment
     // Sanitize user-provided env vars to prevent injection of dangerous values
-    const ptyProcess = pty.spawn("claude", [], {
+    // Use .cmd extension on Windows for proper command resolution
+    const claudeCommand = isWindows ? "claude.cmd" : "claude";
+
+    // Build spawn args - add --resume flag if we have a session ID to resume
+    const spawnArgs: string[] = [];
+    if (resumeSessionId) {
+      spawnArgs.push("--resume", resumeSessionId);
+      debug.log("[AgentProcessManager] Resuming Claude session:", resumeSessionId);
+    }
+
+    // Build PTY options with platform-specific settings
+    const ptyOptions: Pty.IPtyForkOptions = {
       name: "xterm-256color",
       cols: 80,
       rows: 24,
@@ -151,7 +176,11 @@ class AgentProcessManager extends EventEmitter {
         // Sanitize user-provided env vars to prevent injection
         ...sanitizeEnv(env),
       },
-    });
+      // Windows-specific options for ConPTY
+      ...(isWindows && { useConpty: true, encoding: "utf8" as BufferEncoding }),
+    };
+
+    const ptyProcess = pty.spawn(claudeCommand, spawnArgs, ptyOptions);
 
     const agent: Agent = {
       id: agentId,
@@ -161,6 +190,8 @@ class AgentProcessManager extends EventEmitter {
       status: "starting",
       createdAt: new Date(),
       lastActivity: new Date(),
+      // Preserve the resumed session ID if provided
+      ...(resumeSessionId && { claudeSessionId: resumeSessionId }),
     };
 
     this.agents.set(agentId, agent);
@@ -317,6 +348,9 @@ class AgentProcessManager extends EventEmitter {
     agent.status = "exited";
     this.emit("agent:status", { agentId, status: "exited", exitCode });
     this.sendToRenderer("agent:exited", { agentId, exitCode });
+
+    // Send notification
+    notificationService.notifyAgentComplete(agentId, exitCode);
   }
 
   writeToAgent(agentId: string, data: string): void {
@@ -359,7 +393,16 @@ class AgentProcessManager extends EventEmitter {
     }
 
     try {
-      agent.pty.kill();
+      // Use platform-appropriate kill signal
+      // On Windows, node-pty handles this internally via ConPTY
+      // On Unix, we can use SIGTERM for graceful shutdown
+      if (isWindows) {
+        agent.pty.kill();
+      } else {
+        // On Unix, try SIGTERM first for graceful shutdown
+        // node-pty will fall back to SIGKILL if needed
+        agent.pty.kill("SIGTERM");
+      }
     } catch {
       // PTY may already be dead
     }
@@ -383,6 +426,18 @@ class AgentProcessManager extends EventEmitter {
     return Array.from(this.agents.values()).filter((a) => a.sessionId === sessionId);
   }
 
+  /**
+   * Get the last agent with a Claude session ID for a given session
+   * Used to find resumable sessions
+   */
+  getLastAgentWithClaudeSession(sessionId: string): Agent | undefined {
+    const sessionAgents = this.getAgentsBySession(sessionId);
+    // Find the most recent agent with a claudeSessionId
+    return sessionAgents
+      .filter((a) => a.claudeSessionId)
+      .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())[0];
+  }
+
   getOutputBuffer(agentId: string): string[] {
     return this.outputBuffers.get(agentId)?.toArray() || [];
   }
@@ -394,6 +449,26 @@ class AgentProcessManager extends EventEmitter {
   setActiveAgent(agentId: string | null): void {
     debug.log("[AgentProcessManager] setActiveAgent called:", agentId);
     claudeHooksServer.setCurrentAgent(agentId);
+  }
+
+  /**
+   * Update the Claude session ID for an agent
+   * Called when Claude CLI sends session_id via hooks
+   */
+  updateClaudeSessionId(agentId: string, claudeSessionId: string): void {
+    const agent = this.agents.get(agentId);
+    if (agent) {
+      agent.claudeSessionId = claudeSessionId;
+      debug.log("[AgentProcessManager] Updated claudeSessionId for agent:", agentId.slice(0, 8));
+    }
+  }
+
+  /**
+   * Get the Claude session ID for an agent
+   */
+  getClaudeSessionId(agentId: string): string | undefined {
+    const agent = this.agents.get(agentId);
+    return agent?.claudeSessionId;
   }
 
   private sendToRenderer(channel: string, data: unknown): void {

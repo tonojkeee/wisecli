@@ -1,5 +1,12 @@
 import React from "react";
 import { cn } from "@renderer/lib/utils";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@renderer/components/ui/card";
 
 interface SettingRowProps {
   label: string;
@@ -12,7 +19,12 @@ interface SettingRowProps {
 export function SettingRow({ label, description, children, className, indent }: SettingRowProps) {
   return (
     <div
-      className={cn("flex items-center justify-between gap-4 py-3", indent && "pl-4", className)}
+      className={cn(
+        "flex items-center justify-between gap-4 py-3 px-4 -mx-4 rounded-lg",
+        "hover:bg-muted/30 transition-colors",
+        indent && "pl-8",
+        className
+      )}
     >
       <div className="flex-1 space-y-0.5">
         <div className="flex items-center gap-1.5">
@@ -34,12 +46,12 @@ interface SettingGroupProps {
 
 export function SettingGroup({ title, description, children, className }: SettingGroupProps) {
   return (
-    <div className={cn("space-y-1", className)}>
-      <div className="mb-3">
-        <h4 className="text-sm font-semibold">{title}</h4>
-        {description && <p className="text-xs text-muted-foreground">{description}</p>}
-      </div>
-      {children}
-    </div>
+    <Card className={cn("bg-muted/20 border-muted/40", className)}>
+      <CardHeader className="pb-3 pt-4 px-4">
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        {description && <CardDescription className="text-xs">{description}</CardDescription>}
+      </CardHeader>
+      <CardContent className="px-4 pb-4 pt-0 space-y-0">{children}</CardContent>
+    </Card>
   );
 }

@@ -170,6 +170,10 @@
         "resetAllSettings": "Reset All Settings",
         "resetAllSettingsDesc": "This will reset all application settings to their default values. Your Claude CLI settings and sessions will not be affected."
       }
+    },
+    "glm5": {
+      "title": "GLM-5 Chat",
+      "description": "Configure GLM-5 chat integration"
     }
   }
 }

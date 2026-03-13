@@ -8,3 +8,4 @@ export * from "./todo";
 export * from "./statusline";
 export * from "./claude-code";
 export * from "./claude-task";
+export * from "./chat";

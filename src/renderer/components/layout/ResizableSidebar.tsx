@@ -1,5 +1,6 @@
-import React, { useCallback, useRef, useState, useEffect } from "react";
-import { GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import {
@@ -9,14 +10,11 @@ import {
   TooltipTrigger,
 } from "@renderer/components/ui/tooltip";
 
-interface ResizableSidebarProps {
+interface SidebarProps {
   children: React.ReactNode;
   width: number;
   collapsed: boolean;
   collapsedWidth: number;
-  minWidth: number;
-  maxWidth: number;
-  onWidthChange: (width: number) => void;
   onToggleCollapse: () => void;
   className?: string;
 }
@@ -26,82 +24,26 @@ export function ResizableSidebar({
   width,
   collapsed,
   collapsedWidth,
-  minWidth: _minWidth,
-  maxWidth: _maxWidth,
-  onWidthChange,
   onToggleCollapse,
   className,
-}: ResizableSidebarProps) {
-  const [isResizing, setIsResizing] = useState(false);
-  const resizeRef = useRef<HTMLDivElement>(null);
-
+}: SidebarProps) {
+  const { t } = useTranslation("sidebar");
   const effectiveWidth = collapsed ? collapsedWidth : width;
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (collapsed) return;
-      e.preventDefault();
-      setIsResizing(true);
-    },
-    [collapsed]
-  );
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = e.clientX;
-      onWidthChange(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isResizing, onWidthChange]);
-
   return (
-    <div
-      className={cn(
-        "relative flex flex-col border-r border-border/50 bg-gradient-to-b from-background via-background to-muted/5 transition-[width] duration-200",
-        className
-      )}
-      style={{ width: effectiveWidth }}
-    >
-      {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">{children}</div>
-
-      {/* Resize handle and collapse button */}
+    <TooltipProvider delayDuration={300}>
       <div
-        ref={resizeRef}
         className={cn(
-          "absolute right-0 top-0 bottom-0 z-10 flex w-1 cursor-col-resize items-center justify-center group",
-          isResizing && "bg-primary/20",
-          collapsed && "cursor-pointer"
+          "group relative flex flex-col border-r border-border bg-background shadow-sm transition-[width] duration-200",
+          className
         )}
-        onMouseDown={handleMouseDown}
+        style={{ width: effectiveWidth }}
       >
-        {/* Grip indicator */}
-        {!collapsed && (
-          <div
-            className={cn(
-              "absolute right-0 flex h-12 w-1 items-center justify-center rounded-l opacity-0 transition-opacity group-hover:opacity-100",
-              isResizing ? "bg-primary/40" : "bg-border"
-            )}
-          >
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
-          </div>
-        )}
+        {/* Main content */}
+        <div className="flex flex-1 w-full overflow-hidden">{children}</div>
 
         {/* Collapse/expand button */}
-        <TooltipProvider delayDuration={300}>
+        <div className="absolute right-0 top-0 bottom-0 z-10 flex w-4 cursor-pointer items-center justify-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -124,11 +66,11 @@ export function ResizableSidebar({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={8}>
-              {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              {collapsed ? t("expandSidebar") : t("collapseSidebar")}
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

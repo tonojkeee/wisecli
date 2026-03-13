@@ -21,11 +21,11 @@ export function registerClaudeCodeIpcHandlers(): void {
     await claudeCodeServer.stop();
   });
 
-  ipcMain.handle("claude-code:selection-changed", (_, payload: SelectionChangedPayload) => {
+  ipcMain.on("claude-code:selection-changed", (_, payload: SelectionChangedPayload) => {
     claudeCodeServer.sendSelectionChanged(payload);
   });
 
-  ipcMain.handle("claude-code:at-mentioned", (_, payload: AtMentionedPayload) => {
+  ipcMain.on("claude-code:at-mentioned", (_, payload: AtMentionedPayload) => {
     claudeCodeServer.sendAtMentioned(payload);
   });
 

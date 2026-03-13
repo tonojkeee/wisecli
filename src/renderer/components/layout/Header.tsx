@@ -35,6 +35,7 @@ export function Header({
           className="h-8 w-8"
           onClick={onOpenAppSettings}
           title={t("header.appSettings")}
+          aria-label={t("header.appSettings")}
         >
           <Settings className="h-4 w-4" />
         </Button>
@@ -44,6 +45,7 @@ export function Header({
           className="h-8 w-8"
           onClick={onOpenClaudeSettings}
           title={t("header.claudeApiSettings")}
+          aria-label={t("header.claudeApiSettings")}
         >
           <Download className="h-4 w-4 rotate-180" />
         </Button>
@@ -54,6 +56,7 @@ export function Header({
           onClick={onExportLogs}
           disabled={!hasActiveAgent}
           title={t("header.exportLogs")}
+          aria-label={t("header.exportLogs")}
         >
           <Download className="h-4 w-4" />
         </Button>

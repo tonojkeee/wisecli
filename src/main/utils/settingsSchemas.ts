@@ -10,6 +10,8 @@ export const appearanceSettingsSchema = z.object({
   fontSize: z.number().int().min(8).max(32),
   fontFamily: z.string().max(256),
   language: z.enum(["en", "ru"]),
+  sidebarWidth: z.number().int().min(200).max(500),
+  sidebarCollapsed: z.boolean(),
 });
 
 // Terminal settings schema

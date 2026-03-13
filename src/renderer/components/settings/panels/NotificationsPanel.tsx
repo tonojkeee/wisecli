@@ -1,28 +1,21 @@
-import React from 'react'
-import { useTranslation } from 'react-i18next'
-import { SettingRow, SettingGroup, SettingToggle } from '../components'
-import { useSettingsStore, useNotificationSettings } from '@renderer/stores/useSettingsStore'
+import React from "react";
+import { useTranslation } from "react-i18next";
+import { SettingRow, SettingGroup, SettingToggle } from "../components";
+import { useSettingsStore, useNotificationSettings } from "@renderer/stores/useSettingsStore";
 
 export function NotificationsPanel() {
-  const { t } = useTranslation('settings')
-  const updateNotifications = useSettingsStore((state) => state.updateNotifications)
-  const notifications = useNotificationSettings()
+  const { t } = useTranslation("settings");
+  const updateNotifications = useSettingsStore((state) => state.updateNotifications);
+  const notifications = useNotificationSettings();
 
-  if (!notifications) return null
+  if (!notifications) return null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold">{t('panels.notifications.title')}</h3>
-        <p className="text-sm text-muted-foreground">
-          {t('panels.notifications.description')}
-        </p>
-      </div>
-
-      <SettingGroup title={t('panels.notifications.general.title')}>
+    <div className="space-y-4">
+      <SettingGroup title={t("panels.notifications.general.title")}>
         <SettingRow
-          label={t('panels.notifications.general.enableNotifications')}
-          description={t('panels.notifications.general.enableNotificationsDesc')}
+          label={t("panels.notifications.general.enableNotifications")}
+          description={t("panels.notifications.general.enableNotificationsDesc")}
         >
           <SettingToggle
             checked={notifications.enabled}
@@ -31,8 +24,8 @@ export function NotificationsPanel() {
         </SettingRow>
 
         <SettingRow
-          label={t('panels.notifications.general.systemNotifications')}
-          description={t('panels.notifications.general.systemNotificationsDesc')}
+          label={t("panels.notifications.general.systemNotifications")}
+          description={t("panels.notifications.general.systemNotificationsDesc")}
           indent
         >
           <SettingToggle
@@ -43,8 +36,8 @@ export function NotificationsPanel() {
         </SettingRow>
 
         <SettingRow
-          label={t('panels.notifications.general.sound')}
-          description={t('panels.notifications.general.soundDesc')}
+          label={t("panels.notifications.general.sound")}
+          description={t("panels.notifications.general.soundDesc")}
           indent
         >
           <SettingToggle
@@ -55,16 +48,16 @@ export function NotificationsPanel() {
         </SettingRow>
       </SettingGroup>
 
-      <SettingGroup title={t('panels.notifications.notifyOn.title')}>
+      <SettingGroup title={t("panels.notifications.notifyOn.title")}>
         <SettingRow
-          label={t('panels.notifications.notifyOn.agentTaskComplete')}
-          description={t('panels.notifications.notifyOn.agentTaskCompleteDesc')}
+          label={t("panels.notifications.notifyOn.agentTaskComplete")}
+          description={t("panels.notifications.notifyOn.agentTaskCompleteDesc")}
         >
           <SettingToggle
             checked={notifications.notifyOn.agentComplete}
             onChange={(checked) =>
               updateNotifications({
-                notifyOn: { ...notifications.notifyOn, agentComplete: checked }
+                notifyOn: { ...notifications.notifyOn, agentComplete: checked },
               })
             }
             disabled={!notifications.enabled}
@@ -72,14 +65,14 @@ export function NotificationsPanel() {
         </SettingRow>
 
         <SettingRow
-          label={t('panels.notifications.notifyOn.agentErrors')}
-          description={t('panels.notifications.notifyOn.agentErrorsDesc')}
+          label={t("panels.notifications.notifyOn.agentErrors")}
+          description={t("panels.notifications.notifyOn.agentErrorsDesc")}
         >
           <SettingToggle
             checked={notifications.notifyOn.agentError}
             onChange={(checked) =>
               updateNotifications({
-                notifyOn: { ...notifications.notifyOn, agentError: checked }
+                notifyOn: { ...notifications.notifyOn, agentError: checked },
               })
             }
             disabled={!notifications.enabled}
@@ -87,5 +80,5 @@ export function NotificationsPanel() {
         </SettingRow>
       </SettingGroup>
     </div>
-  )
+  );
 }

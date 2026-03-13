@@ -8,6 +8,8 @@ interface TodoState {
   getTodos: (agentId: string) => Todo[];
   getStats: (agentId: string) => TodoStats;
   clearTodos: (agentId: string) => void;
+  deleteTodo: (agentId: string, todoId: string) => void;
+  deleteAllTodos: (agentId: string) => void;
 }
 
 export const useTodoStore = create<TodoState>((set, get) => ({
@@ -36,6 +38,30 @@ export const useTodoStore = create<TodoState>((set, get) => ({
   },
 
   clearTodos: (agentId) => {
+    set((state) => {
+      const newMap = new Map(state.todosByAgent);
+      newMap.delete(agentId);
+      return { todosByAgent: newMap };
+    });
+  },
+
+  deleteTodo: (agentId, todoId) => {
+    set((state) => {
+      const todos = state.todosByAgent.get(agentId);
+      if (!todos) return state;
+
+      const newTodos = todos.filter((t) => t.id !== todoId);
+      const newMap = new Map(state.todosByAgent);
+      if (newTodos.length > 0) {
+        newMap.set(agentId, newTodos);
+      } else {
+        newMap.delete(agentId);
+      }
+      return { todosByAgent: newMap };
+    });
+  },
+
+  deleteAllTodos: (agentId) => {
     set((state) => {
       const newMap = new Map(state.todosByAgent);
       newMap.delete(agentId);

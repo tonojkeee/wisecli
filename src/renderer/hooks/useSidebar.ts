@@ -1,25 +1,32 @@
 import { useCallback } from "react";
 import { useAppearanceSettings, useSettingsStore } from "@renderer/stores/useSettingsStore";
-
-const MIN_SIDEBAR_WIDTH = 200;
-const MAX_SIDEBAR_WIDTH = 500;
-const COLLAPSED_WIDTH = 48;
-const DEFAULT_WIDTH = 320;
+import {
+  useSidebarStore,
+  useActiveSection,
+  useSidebarFocusedItem,
+  useSidebarSearchQuery,
+  useIsSearchFocused,
+} from "@renderer/stores/useSidebarStore";
+import { SIDEBAR, type SidebarSectionType } from "@renderer/constants/sidebar";
 
 export function useSidebar() {
   const appearance = useAppearanceSettings();
   const updateAppearance = useSettingsStore((state) => state.updateAppearance);
 
-  const width = appearance?.sidebarWidth ?? DEFAULT_WIDTH;
-  const collapsed = appearance?.sidebarCollapsed ?? false;
+  // Section state from sidebar store
+  const activeSection = useActiveSection();
+  const focusedItem = useSidebarFocusedItem();
+  const searchQuery = useSidebarSearchQuery();
+  const isSearchFocused = useIsSearchFocused();
 
-  const setWidth = useCallback(
-    (newWidth: number) => {
-      const clampedWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, newWidth));
-      updateAppearance({ sidebarWidth: clampedWidth });
-    },
-    [updateAppearance]
-  );
+  // Actions from sidebar store
+  const setActiveSection = useSidebarStore((state) => state.setActiveSection);
+  const setFocusedItem = useSidebarStore((state) => state.setFocusedItem);
+  const setSearchQuery = useSidebarStore((state) => state.setSearchQuery);
+  const setIsSearchFocused = useSidebarStore((state) => state.setIsSearchFocused);
+
+  const width = appearance?.sidebarWidth ?? SIDEBAR.DEFAULT_WIDTH;
+  const collapsed = appearance?.sidebarCollapsed ?? false;
 
   const toggleCollapse = useCallback(() => {
     updateAppearance({ sidebarCollapsed: !collapsed });
@@ -37,16 +44,38 @@ export function useSidebar() {
     }
   }, [collapsed, updateAppearance]);
 
+  // Clear search when changing sections
+  const switchSection = useCallback(
+    (section: SidebarSectionType) => {
+      setActiveSection(section);
+      setSearchQuery("");
+      setFocusedItem(null);
+    },
+    [setActiveSection, setSearchQuery, setFocusedItem]
+  );
+
   return {
+    // Dimensions
     width,
     collapsed,
-    collapsedWidth: COLLAPSED_WIDTH,
-    minWidth: MIN_SIDEBAR_WIDTH,
-    maxWidth: MAX_SIDEBAR_WIDTH,
-    setWidth,
+    collapsedWidth: SIDEBAR.COLLAPSED_WIDTH,
+    effectiveWidth: collapsed ? SIDEBAR.COLLAPSED_WIDTH : width,
+
+    // Dimension actions
     toggleCollapse,
     expand,
     collapse,
-    effectiveWidth: collapsed ? COLLAPSED_WIDTH : width,
+
+    // Section state
+    activeSection,
+    focusedItem,
+    searchQuery,
+    isSearchFocused,
+
+    // Section actions
+    setActiveSection: switchSection,
+    setFocusedItem,
+    setSearchQuery,
+    setIsSearchFocused,
   };
 }

@@ -26,12 +26,7 @@ export function AppearancePanel() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold">{t("panels.appearance.title")}</h3>
-        <p className="text-sm text-muted-foreground">{t("panels.appearance.description")}</p>
-      </div>
-
+    <div className="space-y-4">
       <SettingGroup title={t("panels.appearance.language.title")}>
         <SettingRow
           label={t("panels.appearance.language.selectLanguage")}

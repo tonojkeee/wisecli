@@ -44,6 +44,14 @@ import type {
   TaskEvent,
   TaskExportOptions,
   TaskJsonExportOptions,
+  // Chat types
+  ChatAgentInfo,
+  ChatMessage,
+  Glm5Settings,
+  ToolExecutionStartEvent,
+  ToolStartEvent,
+  ToolCompleteEvent,
+  ToolErrorEvent,
 } from "@shared/types";
 
 // Re-export types for renderer
@@ -83,6 +91,13 @@ export type {
   TaskEvent,
   TaskExportOptions,
   TaskJsonExportOptions,
+  ChatAgentInfo,
+  ChatMessage,
+  Glm5Settings,
+  ToolExecutionStartEvent,
+  ToolStartEvent,
+  ToolCompleteEvent,
+  ToolErrorEvent,
 };
 
 // Exposed API to renderer
@@ -100,6 +115,7 @@ const electronAPI = {
       sessionId: string;
       workingDirectory: string;
       env?: Record<string, string>;
+      resumeSessionId?: string;
     }): Promise<AgentInfo> => ipcRenderer.invoke("agent:create", options),
 
     write: (agentId: string, data: string): void =>
@@ -120,6 +136,10 @@ const electronAPI = {
       ipcRenderer.invoke("agent:get-buffer", { agentId }),
 
     setActive: (agentId: string | null): void => ipcRenderer.send("agent:set-active", { agentId }),
+
+    // Get the last agent with a Claude session ID for resumable sessions
+    getResumable: (sessionId: string): Promise<AgentInfo | null> =>
+      ipcRenderer.invoke("agent:get-resumable", sessionId),
 
     // Event listeners
     onOutput: (callback: (event: OutputEvent) => void) => {
@@ -151,6 +171,16 @@ const electronAPI = {
       const handler = (_event: IpcRendererEvent, data: StatuslineEvent) => callback(data);
       ipcRenderer.on("agent:statusline", handler);
       return () => ipcRenderer.removeListener("agent:statusline", handler);
+    },
+
+    // Claude session ID update event
+    onClaudeSession: (callback: (event: { agentId: string; claudeSessionId: string }) => void) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        data: { agentId: string; claudeSessionId: string }
+      ) => callback(data);
+      ipcRenderer.on("agent:claude-session", handler);
+      return () => ipcRenderer.removeListener("agent:claude-session", handler);
     },
   },
 
@@ -396,6 +426,131 @@ const electronAPI = {
     writeText: (text: string): Promise<void> => ipcRenderer.invoke("clipboard:write-text", text),
   },
 
+  // Chat management (GLM-5)
+  chat: {
+    create: (options: { sessionId: string; model?: string }): Promise<ChatAgentInfo> =>
+      ipcRenderer.invoke("chat:create", options),
+
+    get: (agentId: string): Promise<ChatAgentInfo | null> =>
+      ipcRenderer.invoke("chat:get", { agentId }),
+
+    list: (): Promise<ChatAgentInfo[]> => ipcRenderer.invoke("chat:list"),
+
+    listBySession: (sessionId: string): Promise<ChatAgentInfo[]> =>
+      ipcRenderer.invoke("chat:list-by-session", sessionId),
+
+    delete: (agentId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("chat:delete", { agentId }),
+
+    getMessages: (agentId: string): Promise<ChatMessage[]> =>
+      ipcRenderer.invoke("chat:get-messages", { agentId }),
+
+    send: (agentId: string, content: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("chat:send", { agentId, content }),
+
+    cancel: (agentId: string): void => ipcRenderer.send("chat:cancel", { agentId }),
+
+    clear: (agentId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("chat:clear", { agentId }),
+
+    getSettings: (): Promise<Glm5Settings> => ipcRenderer.invoke("chat:get-settings"),
+
+    updateSettings: (settings: Partial<Glm5Settings>): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("chat:update-settings", settings),
+
+    getMcpStatus: (): Promise<{ connected: boolean; toolsCount: number }> =>
+      ipcRenderer.invoke("chat:mcp-status"),
+
+    testMcp: (): Promise<{
+      success: boolean;
+      error?: string;
+      details?: unknown;
+    }> => ipcRenderer.invoke("chat:test-mcp"), // Event listeners
+    onStreamStart: (callback: (event: { agentId: string; messageId: string }) => void) => {
+      const handler = (_event: IpcRendererEvent, data: { agentId: string; messageId: string }) =>
+        callback(data);
+      ipcRenderer.on("chat:stream-start", handler);
+      return () => ipcRenderer.removeListener("chat:stream-start", handler);
+    },
+
+    onStreamDelta: (
+      callback: (event: { agentId: string; messageId: string; delta: string }) => void
+    ) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        data: { agentId: string; messageId: string; delta: string }
+      ) => callback(data);
+      ipcRenderer.on("chat:stream-delta", handler);
+      return () => ipcRenderer.removeListener("chat:stream-delta", handler);
+    },
+
+    onStreamDone: (
+      callback: (event: {
+        agentId: string;
+        messageId: string;
+        fullContent: string;
+        fullReasoning?: string;
+      }) => void
+    ) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        data: { agentId: string; messageId: string; fullContent: string; fullReasoning?: string }
+      ) => callback(data);
+      ipcRenderer.on("chat:stream-done", handler);
+      return () => ipcRenderer.removeListener("chat:stream-done", handler);
+    },
+
+    onUserMessage: (callback: (event: { agentId: string; message: ChatMessage }) => void) => {
+      const handler = (_event: IpcRendererEvent, data: { agentId: string; message: ChatMessage }) =>
+        callback(data);
+      ipcRenderer.on("chat:user-message", handler);
+      return () => ipcRenderer.removeListener("chat:user-message", handler);
+    },
+
+    onStreamReasoning: (
+      callback: (event: { agentId: string; messageId: string; delta: string }) => void
+    ) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        data: { agentId: string; messageId: string; delta: string }
+      ) => callback(data);
+      ipcRenderer.on("chat:stream-reasoning", handler);
+      return () => ipcRenderer.removeListener("chat:stream-reasoning", handler);
+    },
+
+    onError: (callback: (event: { agentId?: string; error: string }) => void) => {
+      const handler = (_event: IpcRendererEvent, data: { agentId?: string; error: string }) =>
+        callback(data);
+      ipcRenderer.on("chat:error", handler);
+      return () => ipcRenderer.removeListener("chat:error", handler);
+    },
+
+    // Tool execution events
+    onToolExecutionStart: (callback: (event: ToolExecutionStartEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, data: ToolExecutionStartEvent) => callback(data);
+      ipcRenderer.on("chat:tool-execution-start", handler);
+      return () => ipcRenderer.removeListener("chat:tool-execution-start", handler);
+    },
+
+    onToolStart: (callback: (event: ToolStartEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, data: ToolStartEvent) => callback(data);
+      ipcRenderer.on("chat:tool-start", handler);
+      return () => ipcRenderer.removeListener("chat:tool-start", handler);
+    },
+
+    onToolComplete: (callback: (event: ToolCompleteEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, data: ToolCompleteEvent) => callback(data);
+      ipcRenderer.on("chat:tool-complete", handler);
+      return () => ipcRenderer.removeListener("chat:tool-complete", handler);
+    },
+
+    onToolError: (callback: (event: ToolErrorEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, data: ToolErrorEvent) => callback(data);
+      ipcRenderer.on("chat:tool-error", handler);
+      return () => ipcRenderer.removeListener("chat:tool-error", handler);
+    },
+  },
+
   // Claude Code Plan Mode Tasks
   tasks: {
     list: (sessionId?: string): Promise<ClaudeTask[]> =>
@@ -415,6 +570,17 @@ const electronAPI = {
 
     exportJSON: (sessionId?: string, options?: TaskJsonExportOptions): Promise<string> =>
       ipcRenderer.invoke("tasks:export-json", sessionId, options),
+
+    delete: (
+      sessionId: string | undefined,
+      taskId: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke("tasks:delete", sessionId, taskId),
+
+    deleteAll: (
+      sessionId: string | undefined
+    ): Promise<{ success: boolean; error?: string; deletedCount?: number }> =>
+      ipcRenderer.invoke("tasks:delete-all", sessionId),
 
     onUpdated: (callback: (event: TaskEvent) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, data: TaskEvent) => callback(data);

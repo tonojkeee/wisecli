@@ -13,14 +13,17 @@ import {
   Network,
   RefreshCw,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { Button } from "@renderer/components/ui/button";
-import { useClaudeTaskStore } from "@renderer/stores/useClaudeTaskStore";
+import { useConfirm } from "@renderer/components/ui/alert-dialog";
+import { useClaudeTaskStore, taskActions } from "@renderer/stores/useClaudeTaskStore";
 import { TaskItem } from "./TaskItem";
 import { TaskExportDialog } from "./TaskExportDialog";
 import { TaskDependencyGraph } from "./TaskDependencyGraph";
+import { TaskContextMenuTrigger } from "./TaskContextMenu";
 import type { TaskEvent, ClaudeTask, TaskStats } from "@shared/types/claude-task";
 
 interface TaskProgressPanelProps {
@@ -32,6 +35,7 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
   const { t } = useTranslation("terminal");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [confirm, ConfirmDialog] = useConfirm();
 
   // Local state for session-specific tasks
   const [tasks, setTasks] = useState<ClaudeTask[]>([]);
@@ -91,7 +95,6 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
     // Listen for task updates
     const unsubscribe = window.electronAPI.tasks.onUpdated((event: TaskEvent) => {
       // Only process events SPECIFICALLY for this session
-      // Ignore 'all' events - those are for GlobalTasksPanel only
       if (sessionId && event.sessionId === sessionId) {
         setTasks(event.tasks);
         setStats(event.stats);
@@ -129,6 +132,45 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
     [selectedTaskId, setSelectedTask]
   );
 
+  // Handle single task deletion
+  const handleDeleteTask = useCallback(
+    async (taskId: string) => {
+      const confirmed = await confirm({
+        title: t("tasks.delete.title", "Delete Task"),
+        description: t(
+          "tasks.delete.description",
+          "Are you sure you want to delete this task? This action cannot be undone."
+        ),
+        confirmLabel: t("tasks.delete.confirm", "Delete"),
+        cancelLabel: t("tasks.delete.cancel", "Cancel"),
+        destructive: true,
+      });
+
+      if (confirmed) {
+        await taskActions.deleteTask(sessionId, taskId);
+      }
+    },
+    [confirm, t, sessionId]
+  );
+
+  // Handle clear all tasks
+  const handleClearAll = useCallback(async () => {
+    const confirmed = await confirm({
+      title: t("tasks.clearAll.title", "Clear All Tasks"),
+      description: t(
+        "tasks.clearAll.description",
+        "Are you sure you want to delete all tasks for this session? This action cannot be undone."
+      ),
+      confirmLabel: t("tasks.clearAll.confirm", "Clear All"),
+      cancelLabel: t("tasks.clearAll.cancel", "Cancel"),
+      destructive: true,
+    });
+
+    if (confirmed) {
+      await taskActions.deleteAllTasks(sessionId);
+    }
+  }, [confirm, t, sessionId]);
+
   // Don't render if no tasks and not loading
   if (visibleTasks.length === 0 && !loading) {
     return null;
@@ -141,7 +183,10 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
       {/* Header */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        aria-expanded={!isCollapsed}
+        aria-controls="task-panel-content"
+        aria-label={`${t("tasks.sessionTitle", "Session Tasks")}: ${stats.completed} of ${stats.total} completed, ${progressPercent}% progress${blockedTasks.length > 0 ? `, ${blockedTasks.length} blocked` : ""}`}
       >
         <div className="flex items-center gap-2">
           {isCollapsed ? (
@@ -183,18 +228,29 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
 
       {/* Content */}
       {!isCollapsed && (
-        <div className="border-t border-border/50">
+        <div
+          id="task-panel-content"
+          className="border-t border-border/50"
+          role="status"
+          aria-live="polite"
+        >
           {/* Toolbar */}
           <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30">
             <div className="flex items-center gap-1">
               {/* View mode toggle */}
-              <div className="flex items-center border rounded-md overflow-hidden">
+              <div
+                className="flex items-center border rounded-md overflow-hidden"
+                role="group"
+                aria-label="View mode"
+              >
                 <Button
                   variant="ghost"
                   size="sm"
                   className={cn("h-6 px-2 rounded-none", viewMode === "list" && "bg-accent")}
                   onClick={() => setViewMode("list")}
                   title="List view"
+                  aria-label="List view"
+                  aria-pressed={viewMode === "list"}
                 >
                   <List className="h-3.5 w-3.5" />
                 </Button>
@@ -204,6 +260,8 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
                   className={cn("h-6 px-2 rounded-none", viewMode === "graph" && "bg-accent")}
                   onClick={() => setViewMode("graph")}
                   title="Dependency graph"
+                  aria-label="Dependency graph view"
+                  aria-pressed={viewMode === "graph"}
                 >
                   <Network className="h-3.5 w-3.5" />
                 </Button>
@@ -218,6 +276,21 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
             </div>
 
             <div className="flex items-center gap-1">
+              {/* Clear All button */}
+              {visibleTasks.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={handleClearAll}
+                  disabled={loading}
+                  title={t("tasks.clearAll.tooltip", "Clear all tasks")}
+                  aria-label="Clear all tasks"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+
               {/* Refresh button */}
               <Button
                 variant="ghost"
@@ -226,6 +299,7 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
                 onClick={handleRefresh}
                 disabled={loading}
                 title="Refresh tasks"
+                aria-label="Refresh tasks"
               >
                 <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
               </Button>
@@ -237,6 +311,7 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
                 className="h-6 px-2"
                 onClick={() => setShowExportDialog(true)}
                 title="Export tasks"
+                aria-label="Export tasks"
               >
                 <Download className="h-3.5 w-3.5" />
               </Button>
@@ -253,13 +328,20 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
                   </div>
                 ) : (
                   visibleTasks.map((task) => (
-                    <TaskItem
-                      key={task.id}
+                    <TaskContextMenuTrigger
+                      key={`${task.id}-ctx`}
                       task={task}
-                      isSelected={selectedTaskId === task.id}
-                      isBlocked={blockedTasks.some((bt) => bt.id === task.id)}
-                      onClick={() => handleTaskSelect(task.id)}
-                    />
+                      onDelete={handleDeleteTask}
+                      onViewDetails={(taskId) => handleTaskSelect(taskId)}
+                    >
+                      <TaskItem
+                        task={task}
+                        isSelected={selectedTaskId === task.id}
+                        isBlocked={blockedTasks.some((bt) => bt.id === task.id)}
+                        onClick={() => handleTaskSelect(task.id)}
+                        onDelete={handleDeleteTask}
+                      />
+                    </TaskContextMenuTrigger>
                   ))
                 )}
               </div>
@@ -286,6 +368,9 @@ export function TaskProgressPanel({ agentId: _agentId, sessionId }: TaskProgress
         onOpenChange={setShowExportDialog}
         sessionId={sessionId}
       />
+
+      {/* Confirm dialog */}
+      <ConfirmDialog />
     </div>
   );
 }

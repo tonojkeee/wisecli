@@ -18,6 +18,7 @@ import {
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { StatuslineInput, DisplayStatusline } from "@shared/types/statusline";
+import { agentProcessManager } from "./AgentProcessManager.js";
 import { debug } from "../utils/debug.js";
 
 const isWindows = process.platform === "win32";
@@ -312,6 +313,25 @@ class ClaudeHooksServer {
       "[ClaudeHooksServer] Received statusline update, currentAgentId:",
       this.currentAgentId
     );
+
+    // Update the agent's claudeSessionId if we have both agentId and sessionId
+    if (this.currentAgentId && data.sessionId) {
+      debug.log(
+        "[ClaudeHooksServer] Updating claudeSessionId for agent:",
+        this.currentAgentId.slice(0, 8),
+        "sessionId:",
+        data.sessionId.slice(0, 8)
+      );
+      agentProcessManager.updateClaudeSessionId(this.currentAgentId, data.sessionId);
+
+      // Also notify renderer about the Claude session ID update
+      BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send("agent:claude-session", {
+          agentId: this.currentAgentId,
+          claudeSessionId: data.sessionId,
+        });
+      });
+    }
 
     // Notify callbacks
     this.updateCallbacks.forEach((callback) => {

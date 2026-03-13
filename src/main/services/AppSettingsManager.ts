@@ -249,6 +249,9 @@ class AppSettingsManager extends EventEmitter {
       if (updates.behavior?.autoStart !== undefined) {
         this.emit("auto-start-changed", updates.behavior.autoStart);
       }
+      if (updates.advanced !== undefined) {
+        this.emit("advanced-changed", updated.advanced);
+      }
 
       return true;
     } catch (error) {
@@ -376,7 +379,11 @@ class AppSettingsManager extends EventEmitter {
     const shortcuts = this.get().shortcuts.shortcuts;
     if (shortcuts[id]) {
       shortcuts[id] = { ...shortcuts[id], accelerator };
-      return this.update({ shortcuts: { shortcuts } });
+      const result = this.update({ shortcuts: { shortcuts } });
+      if (result) {
+        this.emit("shortcuts-changed", shortcuts);
+      }
+      return result;
     }
     return false;
   }

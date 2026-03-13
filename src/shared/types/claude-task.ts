@@ -47,6 +47,8 @@ export interface ClaudeTask {
   completedAt?: number;
   /** Additional metadata */
   metadata?: Record<string, unknown>;
+  /** Session/team name this task belongs to (directory name in ~/.claude/tasks/) */
+  sessionName?: string;
 }
 
 /**

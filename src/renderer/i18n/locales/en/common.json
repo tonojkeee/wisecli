@@ -21,7 +21,25 @@
     "idle": "Idle",
     "running": "Running",
     "starting": "Starting...",
-    "exited": "Exited"
+    "exited": "Exited",
+    "done": "Done",
+    "active": "Active",
+    "pending": "Pending",
+    "deleted": "Deleted"
+  },
+  "priority": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "git": {
+    "modified": "Modified",
+    "added": "Added",
+    "deleted": "Deleted",
+    "renamed": "Renamed",
+    "copied": "Copied",
+    "untracked": "Untracked"
   },
   "units": {
     "day": "day",
@@ -51,5 +69,7 @@
     "failedToKillAgent": "Failed to kill agent",
     "failedToExportLogs": "Failed to export logs",
     "settingsSaved": "Settings saved successfully"
-  }
+  },
+  "copied": "Copied",
+  "download": "Download"
 }

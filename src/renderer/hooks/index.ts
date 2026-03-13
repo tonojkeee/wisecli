@@ -4,3 +4,6 @@ export { useClaudeSettings } from "./useClaudeSettings";
 export { useSessionActions } from "./useSessionActions";
 export { useAgentActions } from "./useAgentActions";
 export { useSidebar } from "./useSidebar";
+export { useSidebarKeyboardNav } from "./useSidebarKeyboardNav";
+export { useChatActions } from "./useChatActions";
+export { useChatInitialization } from "./useChatInitialization";

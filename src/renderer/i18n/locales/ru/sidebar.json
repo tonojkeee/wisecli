@@ -1,11 +1,86 @@
 {
+  "sections": {
+    "files": "Файлы",
+    "agents": "Агенты",
+    "chats": "Чаты",
+    "tasks": "Задачи"
+  },
+  "settings": "Настройки",
+  "search": {
+    "placeholder": "Поиск...",
+    "sessions": "Поиск сессий...",
+    "files": "Поиск файлов...",
+    "agents": "Поиск агентов...",
+    "chats": "Поиск чатов...",
+    "tasks": "Поиск задач...",
+    "sessionsAndAgents": "Поиск сессий и агентов...",
+    "clear": "Очистить поиск"
+  },
+  "accordion": {
+    "expandSession": "Развернуть сессию",
+    "collapseSession": "Свернуть сессию"
+  },
+  "sessionCount": "сессий",
+  "agentCount": "агентов",
+  "current": "текущая",
+  "openFiles": "открыто",
+  "running": "запущено",
+  "pendingTasks": "в ожидании",
+  "chatCount": "чатов",
+  "streaming": "стримится",
+  "sessionActions": "Действия с сессией",
+  "noResults": "Ничего не найдено",
+  "noSessions": "Нет сессий",
+  "createFirst": "Создать первую сессию",
+  "empty": {
+    "sessions": {
+      "title": "Нет сессий",
+      "description": "Создайте первую сессию для начала работы",
+      "action": "Создать сессию"
+    },
+    "agents": {
+      "title": "Нет запущенных агентов",
+      "description": "Запустите агента для начала работы",
+      "action": "Запустить агента"
+    },
+    "files": {
+      "emptyFolder": "Папка пуста",
+      "noResults": "Файлы не найдены по вашему запросу"
+    },
+    "tasks": {
+      "title": "Нет отслеживаемых задач",
+      "description": "Задачи появятся здесь при работе агентов"
+    },
+    "chats": {
+      "title": "Нет чатов",
+      "description": "Начните чат для разговора",
+      "action": "Новый чат"
+    },
+    "search": {
+      "noResults": "Ничего не найдено"
+    }
+  },
+  "shortcuts": {
+    "switchSection": "Переключить секцию (1-3)",
+    "search": "Фокус на поиск (⌘P)",
+    "toggle": "Свернуть/развернуть (⌘B)",
+    "navigate": "Навигация (↑/↓)",
+    "select": "Выбрать (Enter)",
+    "delete": "Удалить (⌫)",
+    "rename": "Переименовать (F2)"
+  },
   "navigation": {
     "appearance": "Внешний вид",
     "terminal": "Терминал",
+    "glm5": "GLM-5 Чат",
     "behavior": "Поведение",
     "shortcuts": "Горячие клавиши",
     "notifications": "Уведомления",
     "privacy": "Конфиденциальность",
     "advanced": "Дополнительно"
-  }
+  },
+  "contextUsage": "контекст",
+  "connecting": "подключение...",
+  "expandSidebar": "Развернуть панель",
+  "collapseSidebar": "Свернуть панель"
 }
