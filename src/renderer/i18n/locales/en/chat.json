@@ -1,0 +1,75 @@
+{
+  "newChat": "New Chat",
+  "chat": "Chat",
+  "chats": "Chats",
+  "sendMessage": "Send message",
+  "typeMessage": "Type a message...",
+  "sending": "Sending...",
+  "streaming": "Streaming...",
+  "idle": "Idle",
+  "error": "Error",
+  "clearChat": "Clear chat",
+  "deleteChat": "Delete chat",
+  "confirmDelete": "Are you sure you want to delete this chat?",
+  "confirmClear": "Are you sure you want to clear this conversation?",
+  "noMessages": "No messages yet. Start a conversation!",
+  "thinking": "Thinking",
+  "thinkingEnabled": "Thinking mode enabled",
+  "thinkingDisabled": "Enable thinking mode",
+  "toolExecution": {
+    "title": "Tools"
+  },
+  "settings": {
+    "title": "GLM-5 Settings",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "Enter your GLM-5 API key",
+    "apiKeyDescription": "Get your API key from z.ai",
+    "baseUrl": "Base URL",
+    "baseUrlDescription": "GLM-5 API endpoint",
+    "model": "Model",
+    "modelDescription": "Select the GLM-5 model to use",
+    "temperature": "Temperature",
+    "temperatureDescription": "Controls randomness (0-2). Higher = more creative",
+    "maxTokens": "Max Tokens",
+    "maxTokensDescription": "Maximum tokens in the response",
+    "thinkingEnabled": "Extended Thinking",
+    "thinkingEnabledDescription": "Show model reasoning and thought process",
+    "save": "Save Settings",
+    "saved": "Settings saved",
+    "saveError": "Failed to save settings",
+    "mcpTools": {
+      "title": "MCP Tools",
+      "test": "Test MCP Connection",
+      "testSuccess": "MCP connection successful",
+      "testFailed": "MCP connection failed",
+      "webSearch": "Web Search",
+      "webSearchDesc": "Search the web for information",
+      "webReader": "Web Reader",
+      "webReaderDesc": "Read and extract content from URLs",
+      "gitHubReader": "GitHub Reader",
+      "gitHubReaderDesc": "Read GitHub repositories and files",
+      "vision": "Vision Analysis",
+      "visionDesc": "Analyze images and screenshots"
+    },
+    "reset": "Reset to Defaults"
+  },
+  "errors": {
+    "noApiKey": "API key not configured. Please set up GLM-5 in Settings.",
+    "sendFailed": "Failed to send message",
+    "streamFailed": "Stream interrupted",
+    "unknown": "An unknown error occurred"
+  },
+  "welcome": {
+    "title": "How can I help you today?",
+    "subtitle": "Start a conversation or try one of these suggestions"
+  },
+  "suggestions": {
+    "explain": "Explain how async/await works",
+    "debug": "Help me debug this error",
+    "code": "Write a function to...",
+    "review": "Review my code for improvements"
+  },
+  "stop": "Stop",
+  "keyboardHint": "Enter to send • Shift+Enter for new line",
+  "refreshSuggestions": "Show different suggestions"
+}

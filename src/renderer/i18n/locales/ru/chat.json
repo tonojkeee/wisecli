@@ -1,0 +1,75 @@
+{
+  "newChat": "Новый чат",
+  "chat": "Чат",
+  "chats": "Чаты",
+  "sendMessage": "Отправить сообщение",
+  "typeMessage": "Введите сообщение...",
+  "sending": "Отправка...",
+  "streaming": "Потоковая передача...",
+  "idle": "Ожидание",
+  "error": "Ошибка",
+  "clearChat": "Очистить чат",
+  "deleteChat": "Удалить чат",
+  "confirmDelete": "Вы уверены, что хотите удалить этот чат?",
+  "confirmClear": "Вы уверены, что хотите очистить разговор?",
+  "noMessages": "Нет сообщений. Начните разговор!",
+  "thinking": "Размышление",
+  "thinkingEnabled": "Режим размышления включён",
+  "thinkingDisabled": "Включить режим размышления",
+  "toolExecution": {
+    "title": "Инструменты"
+  },
+  "settings": {
+    "title": "Настройки GLM-5",
+    "apiKey": "API ключ",
+    "apiKeyPlaceholder": "Введите ваш API ключ GLM-5",
+    "apiKeyDescription": "Получите API ключ на z.ai",
+    "baseUrl": "Базовый URL",
+    "baseUrlDescription": "Конечная точка API GLM-5",
+    "model": "Модель",
+    "modelDescription": "Выберите модель GLM-5",
+    "temperature": "Температура",
+    "temperatureDescription": "Контролирует случайность (0-2). Выше = креативнее",
+    "maxTokens": "Макс. токенов",
+    "maxTokensDescription": "Максимальное количество токенов в ответе",
+    "thinkingEnabled": "Расширенное мышление",
+    "thinkingEnabledDescription": "Показывать рассуждения и мыслительный процесс модели",
+    "save": "Сохранить настройки",
+    "saved": "Настройки сохранены",
+    "saveError": "Ошибка сохранения настроек",
+    "mcpTools": {
+      "title": "Инструменты MCP",
+      "test": "Тест соединения MCP",
+      "testSuccess": "Соединение MCP успешно",
+      "testFailed": "Ошибка соединения MCP",
+      "webSearch": "Веб-поиск",
+      "webSearchDesc": "Поиск информации в интернете",
+      "webReader": "Читатель веб-страниц",
+      "webReaderDesc": "Чтение и извлечение содержимого URL",
+      "gitHubReader": "Читатель GitHub",
+      "gitHubReaderDesc": "Чтение репозиториев и файлов GitHub",
+      "vision": "Анализ изображений",
+      "visionDesc": "Анализ изображений и скриншотов"
+    },
+    "reset": "Сбросить по умолчанию"
+  },
+  "errors": {
+    "noApiKey": "API ключ не настроен. Настройте GLM-5 в Настройках.",
+    "sendFailed": "Не удалось отправить сообщение",
+    "streamFailed": "Поток прерван",
+    "unknown": "Произошла неизвестная ошибка"
+  },
+  "welcome": {
+    "title": "Чем могу помочь?",
+    "subtitle": "Начните разговор или выберите одну из подсказок"
+  },
+  "suggestions": {
+    "explain": "Объясни как работает async/await",
+    "debug": "Помоги исправить эту ошибку",
+    "code": "Напиши функцию для...",
+    "review": "Проверь мой код на улучшения"
+  },
+  "stop": "Стоп",
+  "keyboardHint": "Enter для отправки • Shift+Enter для новой строки",
+  "refreshSuggestions": "Показать другие подсказки"
+}
