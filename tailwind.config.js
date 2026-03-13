@@ -46,6 +46,12 @@ export default {
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))'
+        },
+        status: {
+          success: 'hsl(var(--success))',
+          warning: 'hsl(var(--warning))',
+          error: 'hsl(var(--error))',
+          info: 'hsl(var(--info))'
         }
       },
       borderRadius: {

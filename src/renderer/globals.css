@@ -24,6 +24,20 @@
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
     --radius: 0.5rem;
+    /* Semantic status colors */
+    --success: 142 76% 36%;
+    --warning: 38 92% 50%;
+    --error: 0 72% 51%;
+    --info: 221 83% 53%;
+    /* Glassmorphism variables */
+    --glass-bg: 0 0% 10% / 0.6;
+    --glass-border: 0 0% 20% / 0.3;
+    --glass-blur: 12px;
+    --glass-shadow: 0 8px 32px / 0.1;
+    /* Accent gradients */
+    --accent-glow: 220 100% 60%;
+    --success-glow: 142 76% 36%;
+    --warning-glow: 38 92% 50%;
   }
 
   .light {
@@ -46,6 +60,11 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
+    /* Semantic status colors (light mode) */
+    --success: 142 76% 36%;
+    --warning: 38 92% 50%;
+    --error: 0 72% 51%;
+    --info: 221 83% 53%;
   }
 }
 
@@ -118,4 +137,157 @@
 
 .animate-slide-in-right {
   animation: slide-in-right 0.15s ease-out;
+}
+
+/* Subtle pulse animation for streaming state */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Focus visible styles for accessibility */
+@layer base {
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Ensure buttons have proper focus indicators */
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Links focus indicator */
+  a:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Interactive elements in sidebar */
+  .sidebar-item:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.sr-only:focus,
+.focus\:not-sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Chat input container styling */
+.chat-input-container textarea {
+  -webkit-appearance: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Chat message animations */
+@keyframes message-appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-message-appear {
+  animation: message-appear 0.2s ease-out;
+}
+
+/* Streaming cursor animation */
+@keyframes blink-cursor {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+.animate-blink-cursor {
+  animation: blink-cursor 1s step-end infinite;
+}
+
+/* Chat welcome state */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Smooth scrollbar for chat */
+.chat-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 3px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
+/* Prose overrides for chat markdown */
+.prose-chat {
+  --tw-prose-body: hsl(var(--foreground) / 0.9);
+  --tw-prose-bold: hsl(var(--foreground));
+  --tw-prose-links: hsl(var(--primary));
+}
+
+/* Tool execution status indicator */
+@keyframes tool-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+}
+
+.animate-tool-pulse {
+  animation: tool-pulse 1.5s ease-in-out infinite;
 }
