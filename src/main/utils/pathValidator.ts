@@ -27,14 +27,25 @@ const PROTECTED_UNIX_PATHS = [
   "/dev",
 ];
 
-// System paths that should never be accessible (Windows)
-const PROTECTED_WINDOWS_PATHS = [
-  "C:\\Windows\\System32",
-  "C:\\Windows\\System",
-  "C:\\Program Files",
-  "C:\\Program Files (x86)",
-  "C:\\Users\\All Users",
-];
+/**
+ * Get protected Windows paths dynamically using environment variables
+ * This handles cases where Windows is not installed on C: drive
+ */
+function getProtectedWindowsPaths(): string[] {
+  const systemRoot = process.env.SystemRoot || process.env.windir || "C:\\Windows";
+  const programFiles = process.env.ProgramFiles || "C:\\Program Files";
+  const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
+  const programData = process.env.ProgramData || "C:\\ProgramData";
+
+  return [
+    path.join(systemRoot, "System32"),
+    path.join(systemRoot, "System"),
+    path.join(systemRoot, "Config"),
+    programFiles,
+    programFilesX86,
+    programData,
+  ];
+}
 
 /**
  * Validates that a path is safe and within allowed directories
@@ -78,7 +89,7 @@ export function validatePath(inputPath: string): {
     }
   }
 
-  for (const protectedPath of PROTECTED_WINDOWS_PATHS) {
+  for (const protectedPath of getProtectedWindowsPaths()) {
     if (normalizedPath.startsWith(protectedPath.toLowerCase())) {
       return { valid: false, error: "Access denied: cannot access system paths" };
     }

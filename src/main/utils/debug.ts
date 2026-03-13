@@ -1,38 +1,37 @@
 /**
  * Debug logging utility
  *
- * Only logs in development mode to reduce console noise in production.
- * All console.error and console.warn calls are always logged.
+ * Delegates to LoggerService which respects log level and debug mode settings.
  */
 
-import { is } from "@electron-toolkit/utils";
+import { loggerService } from "../services/LoggerService.js";
 
 export const debug = {
   /**
-   * Log debug messages (only in dev mode)
+   * Log debug messages
    */
   log: (...args: unknown[]): void => {
-    if (is.dev) {
-      console.log(...args);
-    }
+    loggerService.debug(...args);
   },
 
   /**
-   * Log debug-level messages (only in dev mode)
+   * Log debug-level messages
    */
   debug: (...args: unknown[]): void => {
-    if (is.dev) {
-      console.debug(...args);
-    }
+    loggerService.debug(...args);
   },
 
   /**
-   * Log warnings (always logged)
+   * Log warnings
    */
-  warn: console.warn,
+  warn: (...args: unknown[]): void => {
+    loggerService.warn(...args);
+  },
 
   /**
-   * Log errors (always logged)
+   * Log errors
    */
-  error: console.error,
+  error: (...args: unknown[]): void => {
+    loggerService.error(...args);
+  },
 };
