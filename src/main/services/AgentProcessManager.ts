@@ -87,8 +87,8 @@ class AgentProcessManager extends EventEmitter {
   private pendingOutputs: Map<string, { data: string; timestamp: number }[]> = new Map();
   private flushTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private statusTimeouts: Map<string, NodeJS.Timeout> = new Map();
-  private readonly OUTPUT_BATCH_MS = 16; // ~60fps, imperceptible delay
-  private readonly MAX_BATCH_SIZE = 100; // Increased from 50
+  private readonly OUTPUT_BATCH_MS = 8; // Near-live flush without flooding IPC
+  private readonly MAX_BATCH_SIZE = 120; // Allow larger burst before forced flush
 
   // Track agents being killed to prevent race conditions
   private agentKillState: Map<string, boolean> = new Map();

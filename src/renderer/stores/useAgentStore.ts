@@ -47,6 +47,7 @@ export interface AgentMeta {
 export interface OutputBufferResult {
   buffer: string[];
   version: number;
+  lastChunk: string;
 }
 
 const MAX_BUFFER_SIZE = 1000;
@@ -62,6 +63,11 @@ class OutputBufferStore {
   private cachedSnapshots: Map<string, { version: number; data: string[] }> = new Map();
   // Cached result objects for useSyncExternalStore (to avoid creating new objects)
   private cachedResults: Map<string, OutputBufferResult> = new Map();
+  private lastChunks: Map<string, string> = new Map();
+  // Microtask notification for near-live terminal updates with same-tick coalescing
+  private notifyScheduled = false;
+  // Pending updates to batch
+  private pendingUpdates: Set<string> = new Set();
 
   getBuffer(agentId: string): RingBuffer<string> {
     let buffer = this.buffers.get(agentId);
@@ -75,14 +81,45 @@ class OutputBufferStore {
   appendOutput(agentId: string, data: string): void {
     const buffer = this.getBuffer(agentId);
     buffer.push(data);
-    // Increment version
-    const newVersion = (this.versions.get(agentId) || 0) + 1;
-    this.versions.set(agentId, newVersion);
-    // Invalidate caches
-    this.cachedSnapshots.delete(agentId);
-    this.cachedResults.delete(agentId);
-    // Notify listeners
-    this.notifyListeners();
+    this.lastChunks.set(agentId, data);
+    // Track this agent as having pending updates
+    this.pendingUpdates.add(agentId);
+    // Schedule batched notification
+    this.scheduleNotification();
+  }
+
+  /**
+   * Schedule a batched notification that processes all pending updates at once
+   */
+  private scheduleNotification(): void {
+    if (this.notifyScheduled) {
+      return; // Already scheduled
+    }
+    this.notifyScheduled = true;
+    queueMicrotask(() => {
+      this.flushPendingUpdates();
+    });
+  }
+
+  /**
+   * Flush all pending updates: increment versions, invalidate caches, notify once
+   */
+  private flushPendingUpdates(): void {
+    this.notifyScheduled = false;
+
+    // Process all pending updates
+    for (const agentId of this.pendingUpdates) {
+      // Increment version
+      const newVersion = (this.versions.get(agentId) || 0) + 1;
+      this.versions.set(agentId, newVersion);
+      // Invalidate caches
+      this.cachedSnapshots.delete(agentId);
+      this.cachedResults.delete(agentId);
+    }
+    this.pendingUpdates.clear();
+
+    // Single notification for all updates
+    this.listeners.forEach((listener) => listener());
   }
 
   clearBuffer(agentId: string): void {
@@ -90,22 +127,27 @@ class OutputBufferStore {
     if (buffer) {
       buffer.clear();
     }
-    // Increment version
+    // Remove from pending updates if present
+    this.pendingUpdates.delete(agentId);
+    // Increment version immediately
     this.versions.set(agentId, (this.versions.get(agentId) || 0) + 1);
     // Invalidate caches
     this.cachedSnapshots.delete(agentId);
     this.cachedResults.delete(agentId);
-    // Notify listeners
-    this.notifyListeners();
+    this.lastChunks.delete(agentId);
+    // Notify listeners immediately (no debounce for clear)
+    this.listeners.forEach((listener) => listener());
   }
 
   deleteBuffer(agentId: string): void {
     this.buffers.delete(agentId);
     this.versions.delete(agentId);
+    this.pendingUpdates.delete(agentId);
     this.cachedSnapshots.delete(agentId);
     this.cachedResults.delete(agentId);
-    // Notify listeners
-    this.notifyListeners();
+    this.lastChunks.delete(agentId);
+    // Notify listeners immediately (no debounce for delete)
+    this.listeners.forEach((listener) => listener());
   }
 
   /**
@@ -154,7 +196,11 @@ class OutputBufferStore {
 
     // Create new result and cache it
     const buffer = this.getCachedSnapshot(agentId);
-    const result: OutputBufferResult = { buffer, version: currentVersion };
+    const result: OutputBufferResult = {
+      buffer,
+      version: currentVersion,
+      lastChunk: this.lastChunks.get(agentId) || "",
+    };
     this.cachedResults.set(agentId, result);
     return result;
   }
@@ -178,10 +224,6 @@ class OutputBufferStore {
       this.listeners.delete(listener);
     };
   }
-
-  private notifyListeners(): void {
-    this.listeners.forEach((listener) => listener());
-  }
 }
 
 // Singleton instance for output buffers
@@ -193,7 +235,10 @@ const outputBufferStore = new OutputBufferStore();
 export function useAgentOutputBuffer(agentId: string): OutputBufferResult {
   const getSnapshot = useCallback(() => outputBufferStore.getCachedResult(agentId), [agentId]);
 
-  const getServerSnapshot = useCallback((): OutputBufferResult => ({ buffer: [], version: 0 }), []);
+  const getServerSnapshot = useCallback(
+    (): OutputBufferResult => ({ buffer: [], version: 0, lastChunk: "" }),
+    []
+  );
 
   const subscribe = useCallback(
     (listener: () => void) => outputBufferStore.subscribe(listener),
@@ -350,22 +395,26 @@ export const setActiveAgent = (agentId: string | null): void => {
 };
 
 // Combined type for backward compatibility
-export type Agent = AgentMeta & { outputBuffer: string[]; outputVersion: number };
+export type Agent = AgentMeta & { outputBuffer: string[]; outputVersion: number; lastOutputChunk: string };
 
 // Selectors
 export const useActiveAgent = (): Agent | null => {
-  const agents = useAgentStore((state) => state.agents);
+  // Use shallow comparison for activeAgentId only
   const activeAgentId = useAgentStore((state) => state.activeAgentId);
-  const { buffer: outputBuffer, version: outputVersion } = useAgentOutputBuffer(
+
+  // Subscribe only to the specific agent, not the entire map
+  const agent = useAgentStore(
+    useCallback((state) => (activeAgentId ? state.agents.get(activeAgentId) : null), [activeAgentId])
+  );
+
+  const { buffer: outputBuffer, version: outputVersion, lastChunk } = useAgentOutputBuffer(
     activeAgentId || ""
   );
 
   return useMemo(() => {
-    if (!activeAgentId) return null;
-    const agent = agents.get(activeAgentId);
-    if (!agent) return null;
-    return { ...agent, outputBuffer, outputVersion };
-  }, [agents, activeAgentId, outputBuffer, outputVersion]);
+    if (!activeAgentId || !agent) return null;
+    return { ...agent, outputBuffer, outputVersion, lastOutputChunk: lastChunk };
+  }, [activeAgentId, agent, outputBuffer, outputVersion, lastChunk]);
 };
 
 export const useAgentsBySession = (sessionId: string): Agent[] => {
@@ -377,6 +426,7 @@ export const useAgentsBySession = (sessionId: string): Agent[] => {
       ...agent,
       outputBuffer: getOutputBuffer(agent.id),
       outputVersion: getOutputVersion(agent.id),
+      lastOutputChunk: "",
     }));
 };
 

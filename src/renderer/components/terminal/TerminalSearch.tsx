@@ -1,29 +1,31 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
+import type { ISearchOptions, SearchAddon } from "@xterm/addon-search";
 import { Input } from "@renderer/components/ui/input";
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
 
+const SEARCH_DECORATIONS: NonNullable<ISearchOptions["decorations"]> = {
+  matchBackground: "#7aa2f7",
+  activeMatchBackground: "#f7768e",
+  matchOverviewRuler: "#7aa2f7",
+  activeMatchColorOverviewRuler: "#f7768e",
+};
+
 interface TerminalSearchProps {
-  searchAddon: null; // Kept for API compatibility, but not used
+  searchAddon: SearchAddon | null;
   isOpen: boolean;
   onClose: () => void;
-  onSearch?: (term: string, options: { caseSensitive: boolean; regex: boolean }) => void;
 }
 
 /**
- * Terminal search component
- *
- * Note: ghostty-web doesn't have a built-in SearchAddon like xterm.js.
- * This component provides a UI for search, but actual search functionality
- * would need to be implemented differently (e.g., using browser find,
- * or implementing custom buffer search).
+ * Terminal search component using xterm.js SearchAddon
  */
 export function TerminalSearch({
+  searchAddon,
   isOpen,
   onClose,
-  onSearch,
 }: TerminalSearchProps) {
   const { t } = useTranslation("terminal");
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,19 +41,39 @@ export function TerminalSearch({
     }
   }, [isOpen]);
 
-  // Notify parent of search changes
+  // Perform search when search term or options change
   useEffect(() => {
-    if (searchTerm && onSearch) {
-      onSearch(searchTerm, { caseSensitive: matchCase, regex: useRegex });
+    if (searchAddon && searchTerm) {
+      searchAddon.findNext(searchTerm, {
+        caseSensitive: matchCase,
+        wholeWord: false,
+        regex: useRegex,
+        decorations: SEARCH_DECORATIONS,
+      });
     }
-  }, [searchTerm, matchCase, useRegex, onSearch]);
+  }, [searchAddon, searchTerm, matchCase, useRegex]);
 
   const handleSearch = useCallback(
-    (_direction: "next" | "prev") => {
-      // Search navigation not implemented for ghostty-web
-      // Could be implemented with custom buffer search in the future
+    (direction: "next" | "prev") => {
+      if (!searchAddon || !searchTerm) return;
+
+      if (direction === "next") {
+        searchAddon.findNext(searchTerm, {
+          caseSensitive: matchCase,
+          wholeWord: false,
+          regex: useRegex,
+          decorations: SEARCH_DECORATIONS,
+        });
+      } else {
+        searchAddon.findPrevious(searchTerm, {
+          caseSensitive: matchCase,
+          wholeWord: false,
+          regex: useRegex,
+          decorations: SEARCH_DECORATIONS,
+        });
+      }
     },
-    []
+    [searchAddon, searchTerm, matchCase, useRegex]
   );
 
   const handleKeyDown = useCallback(
@@ -61,10 +83,14 @@ export function TerminalSearch({
         handleSearch(e.shiftKey ? "prev" : "next");
       } else if (e.key === "Escape") {
         e.preventDefault();
+        // Clear search highlights before closing
+        if (searchAddon) {
+          searchAddon.clearDecorations();
+        }
         onClose();
       }
     },
-    [handleSearch, onClose]
+    [handleSearch, onClose, searchAddon]
   );
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,6 +104,14 @@ export function TerminalSearch({
   const toggleRegex = useCallback(() => {
     setUseRegex((prev) => !prev);
   }, []);
+
+  // Clear decorations when closing
+  const handleClose = useCallback(() => {
+    if (searchAddon) {
+      searchAddon.clearDecorations();
+    }
+    onClose();
+  }, [onClose, searchAddon]);
 
   if (!isOpen) return null;
 
@@ -122,7 +156,7 @@ export function TerminalSearch({
         variant="ghost"
         size="sm"
         onClick={() => handleSearch("prev")}
-        disabled={!searchTerm}
+        disabled={!searchTerm || !searchAddon}
         className="h-8 w-8 p-0"
         title={t("search.previous", "Previous match")}
       >
@@ -134,7 +168,7 @@ export function TerminalSearch({
         variant="ghost"
         size="sm"
         onClick={() => handleSearch("next")}
-        disabled={!searchTerm}
+        disabled={!searchTerm || !searchAddon}
         className="h-8 w-8 p-0"
         title={t("search.next", "Next match")}
       >
@@ -145,7 +179,7 @@ export function TerminalSearch({
       <Button
         variant="ghost"
         size="sm"
-        onClick={onClose}
+        onClick={handleClose}
         className="h-8 w-8 p-0"
         title={t("search.close", "Close")}
       >

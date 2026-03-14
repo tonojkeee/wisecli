@@ -1,13 +1,20 @@
 import React, { useEffect, useRef, useCallback, useState, useImperativeHandle } from "react";
-import { Terminal, FitAddon } from "ghostty-web";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import { SearchAddon } from "@xterm/addon-search";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import "@xterm/xterm/css/xterm.css";
 import { cn } from "@renderer/lib/utils";
 import { getTerminalTheme } from "@renderer/lib/terminal-theme";
 import { useEffectiveTheme } from "@renderer/stores/useSettingsStore";
+
+const TERMINAL_DEBUG = import.meta.env.DEV;
 
 interface TerminalViewProps {
   agentId: string;
   outputBuffer: string[];
   outputVersion: number;
+  lastOutputChunk: string;
   onInput: (data: string) => void;
   onResize: (cols: number, rows: number) => void;
   fontSize?: number;
@@ -27,6 +34,7 @@ export interface TerminalViewRef {
   hasSelection: () => boolean;
   clearSelection: () => void;
   openSearch: () => void;
+  getSearchAddon: () => SearchAddon | null;
 }
 
 /**
@@ -47,6 +55,7 @@ export const TerminalView = ({
   agentId,
   outputBuffer,
   outputVersion,
+  lastOutputChunk,
   onInput,
   onResize,
   fontSize = 14,
@@ -62,13 +71,26 @@ export const TerminalView = ({
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
   const lastBufferLengthRef = useRef(0);
+  const lastOutputVersionRef = useRef(0);
   const currentAgentIdRef = useRef<string | null>(null);
   const isDisposedRef = useRef(false);
   const [containerReady, setContainerReady] = useState(false);
   const [terminalReady, setTerminalReady] = useState(false);
   const fitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const effectiveTheme = useEffectiveTheme();
+  const diagnosticsRef = useRef({
+    snapshotRenders: 0,
+    liveChunksWritten: 0,
+    forcedResyncs: 0,
+  });
+
+  // Write queue for batching terminal writes
+  const writeQueueRef = useRef<{chunk: string, index: number}[]>([]);
+  const isWritingRef = useRef(false);
+  const rafIdRef = useRef<number | null>(null);
+  const writeBufferRef = useRef("");
 
   // Keep refs updated to avoid stale closures in terminal callbacks
   const onInputRef = useRef(onInput);
@@ -119,6 +141,7 @@ export const TerminalView = ({
         }
       },
       openSearch: () => onSearchOpenRef.current?.(),
+      getSearchAddon: () => searchAddonRef.current,
     }),
     []
   );
@@ -143,6 +166,108 @@ export const TerminalView = ({
     }
   }, []);
 
+  const resetWriteQueue = useCallback(() => {
+    writeQueueRef.current = [];
+    writeBufferRef.current = "";
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    isWritingRef.current = false;
+  }, []);
+
+  // Process write queue in batches using RAF
+  const processWriteQueue = useCallback(() => {
+    if (isDisposedRef.current || !terminalInstanceRef.current) {
+      isWritingRef.current = false;
+      return;
+    }
+
+    const queue = writeQueueRef.current;
+    if (queue.length === 0 && writeBufferRef.current.length === 0) {
+      isWritingRef.current = false;
+      return;
+    }
+
+    // Process a much larger burst per frame for minimal latency.
+    const MAX_CHUNKS_PER_FRAME = 120;
+    const MAX_QUEUE_SIZE = 2000;
+    if (queue.length > MAX_QUEUE_SIZE) {
+      queue.splice(0, queue.length - MAX_QUEUE_SIZE);
+    }
+    const batch = queue.splice(0, MAX_CHUNKS_PER_FRAME);
+    let combined = writeBufferRef.current;
+
+    for (const { chunk } of batch) {
+      if (chunk) {
+        combined += chunk;
+      }
+    }
+
+    writeBufferRef.current = "";
+
+    if (combined && !isDisposedRef.current) {
+      try {
+        terminalInstanceRef.current.write(combined);
+      } catch {
+        isWritingRef.current = false;
+        return;
+      }
+    }
+
+    if (queue.length > 0 || writeBufferRef.current.length > 0) {
+      rafIdRef.current = requestAnimationFrame(processWriteQueue);
+    } else {
+      isWritingRef.current = false;
+    }
+  }, []);
+
+  const enqueueBuffer = useCallback(
+    (buffer: string[]) => {
+      if (buffer.length === 0) return;
+
+      for (let i = 0; i < buffer.length; i++) {
+        const chunk = buffer[i];
+        if (chunk) {
+          writeQueueRef.current.push({ chunk, index: i });
+        }
+      }
+
+      if (!isWritingRef.current) {
+        isWritingRef.current = true;
+        rafIdRef.current = requestAnimationFrame(processWriteQueue);
+      }
+    },
+    [processWriteQueue]
+  );
+
+  const restoreFromSnapshot = useCallback(
+    (reason: "agent-switch" | "snapshot-resync" | "fallback-resync", buffer: string[]) => {
+      const terminal = terminalInstanceRef.current;
+      if (!terminal || isDisposedRef.current) return;
+
+      terminal.clear();
+      resetWriteQueue();
+      enqueueBuffer(buffer);
+
+      diagnosticsRef.current.snapshotRenders += 1;
+      if (reason !== "agent-switch") {
+        diagnosticsRef.current.forcedResyncs += 1;
+      }
+
+      if (TERMINAL_DEBUG) {
+        console.debug("[TerminalView] snapshot restore", {
+          agentId,
+          reason,
+          chunks: buffer.length,
+          outputVersion,
+          diagnostics: diagnosticsRef.current,
+        });
+      }
+    },
+    [agentId, enqueueBuffer, outputVersion, resetWriteQueue]
+  );
+
   // Initialize terminal
   useEffect(() => {
     if (!terminalRef.current || terminalInstanceRef.current || !containerReady) return;
@@ -155,70 +280,84 @@ export const TerminalView = ({
       fontSize,
       fontFamily,
       theme: getTerminalTheme(effectiveTheme === "dark"),
-      scrollback: 10000,
-      wasmPath: "ghostty-vt.wasm", // Path to WASM file in public directory
+      scrollback: 5000, // Reduced to prevent memory issues
     });
 
     const fitAddon = new FitAddon();
+    const searchAddon = new SearchAddon();
+    const webLinksAddon = new WebLinksAddon();
 
     terminal.loadAddon(fitAddon);
+    terminal.loadAddon(searchAddon);
+    terminal.loadAddon(webLinksAddon);
 
-    // Open terminal (async)
-    terminal
-      .open(terminalRef.current)
-      .then(() => {
-        if (isDisposedRef.current) return;
+    // Open terminal (synchronous in xterm.js)
+    terminal.open(terminalRef.current);
 
-        terminalInstanceRef.current = terminal;
-        fitAddonRef.current = fitAddon;
-        setTerminalReady(true);
+    if (isDisposedRef.current) return;
 
-        // Use built-in resize observation
-        fitAddon.observeResize();
+    terminalInstanceRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+    searchAddonRef.current = searchAddon;
+    setTerminalReady(true);
 
-        // Initial fit
-        requestAnimationFrame(() => {
-          if (!isDisposedRef.current) {
-            safeFit();
-          }
-        });
-      })
-      .catch((err) => {
-        console.error("Failed to open terminal:", err);
-      });
+    // Initial fit
+    requestAnimationFrame(() => {
+      if (!isDisposedRef.current) {
+        safeFit();
+      }
+    });
+
+    // Store event listener disposables for cleanup
+    const disposables: Array<{ dispose: () => void }> = [];
 
     // Handle input - use ref to avoid stale closure
-    terminal.onData((data) => {
-      if (!isDisposedRef.current) {
-        onInputRef.current(data);
-      }
-    });
+    disposables.push(
+      terminal.onData((data) => {
+        if (!isDisposedRef.current) {
+          onInputRef.current(data);
+        }
+      })
+    );
 
     // Handle resize - use ref to avoid stale closure
-    terminal.onResize(({ cols, rows }) => {
-      if (!isDisposedRef.current) {
-        onResizeRef.current(cols, rows);
-      }
-    });
+    disposables.push(
+      terminal.onResize(({ cols, rows }) => {
+        if (!isDisposedRef.current) {
+          onResizeRef.current(cols, rows);
+        }
+      })
+    );
 
     // Handle selection change for copy on select
-    terminal.onSelectionChange(() => {
-      if (!isDisposedRef.current && copyOnSelectRef.current) {
-        const selection = terminal.getSelection();
-        if (selection) {
-          window.electronAPI.clipboard.writeText(selection);
+    disposables.push(
+      terminal.onSelectionChange(() => {
+        if (!isDisposedRef.current && copyOnSelectRef.current) {
+          const selection = terminal.getSelection();
+          if (selection) {
+            window.electronAPI.clipboard.writeText(selection);
+          }
         }
-      }
-    });
+      })
+    );
 
     return () => {
       // Mark as disposed first to prevent any pending callbacks
       isDisposedRef.current = true;
 
+      // Dispose all event listeners
+      disposables.forEach((disposable) => disposable.dispose());
+
       // Clear fit timeout
       if (fitTimeoutRef.current) {
         clearTimeout(fitTimeoutRef.current);
         fitTimeoutRef.current = null;
+      }
+
+      // Clear any pending RAF
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
       }
 
       // Dispose terminal
@@ -228,9 +367,41 @@ export const TerminalView = ({
 
       terminalInstanceRef.current = null;
       fitAddonRef.current = null;
+      searchAddonRef.current = null;
       setTerminalReady(false);
     };
   }, [containerReady, safeFit]);
+
+  // Use ResizeObserver for container resize detection (xterm.js pattern)
+  useEffect(() => {
+    const container = terminalRef.current;
+    if (!container || !fitAddonRef.current || !terminalReady) return;
+
+    // Debounce resize handling to prevent excessive fit() calls
+    // Context7 recommends 100ms debounce for resize events
+    let resizeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    const handleResize = () => {
+      if (resizeTimeoutId !== null) {
+        clearTimeout(resizeTimeoutId);
+      }
+      resizeTimeoutId = setTimeout(() => {
+        resizeTimeoutId = null;
+        if (!isDisposedRef.current && fitAddonRef.current) {
+          safeFit();
+        }
+      }, 100);
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
+
+    return () => {
+      if (resizeTimeoutId !== null) {
+        clearTimeout(resizeTimeoutId);
+      }
+      resizeObserver.disconnect();
+    };
+  }, [terminalReady, safeFit]);
 
   // Handle keyboard shortcuts via container events
   useEffect(() => {
@@ -278,34 +449,23 @@ export const TerminalView = ({
     };
   }, [terminalReady]);
 
-  // Handle agent switching and output buffer updates
+  // Restore terminal content from snapshot on agent switch / remount / recovery.
   useEffect(() => {
     const terminal = terminalInstanceRef.current;
     if (!terminal || isDisposedRef.current || !terminalReady) return;
 
     const isAgentSwitch = currentAgentIdRef.current !== agentId;
-
-    // Handle agent switch - clear terminal, write entire buffer of new agent
     if (isAgentSwitch) {
-      terminal.clear();
       currentAgentIdRef.current = agentId;
-
-      // Write the ENTIRE buffer for the new agent
-      if (outputBuffer.length > 0) {
-        const allData = outputBuffer.join("");
-        if (allData && !isDisposedRef.current) {
-          try {
-            terminal.write(allData);
-          } catch {
-            // Terminal may have been disposed
-          }
-        }
-      }
-
-      // Set to current buffer length so we only write NEW data after this
+      diagnosticsRef.current = {
+        snapshotRenders: 0,
+        liveChunksWritten: 0,
+        forcedResyncs: 0,
+      };
+      restoreFromSnapshot("agent-switch", outputBuffer);
       lastBufferLengthRef.current = outputBuffer.length;
+      lastOutputVersionRef.current = outputVersion;
 
-      // Fit terminal after agent switch
       if (fitTimeoutRef.current) {
         clearTimeout(fitTimeoutRef.current);
       }
@@ -323,54 +483,93 @@ export const TerminalView = ({
           }
         }
         fitTimeoutRef.current = null;
-      }, 50);
+      }, 100);
 
       return () => {
         if (fitTimeoutRef.current) {
           clearTimeout(fitTimeoutRef.current);
           fitTimeoutRef.current = null;
         }
+        resetWriteQueue();
       };
     }
 
-    // Write only truly new data (buffer grew since last render)
-    if (outputBuffer.length > lastBufferLengthRef.current) {
-      for (let i = lastBufferLengthRef.current; i < outputBuffer.length; i++) {
-        const chunk = outputBuffer[i];
-        if (chunk && !isDisposedRef.current) {
-          try {
-            terminal.write(chunk);
-          } catch {
-            // Terminal may have been disposed
-            break;
-          }
+    if (outputVersion === 0 && outputBuffer.length === 0 && lastOutputVersionRef.current !== 0) {
+      restoreFromSnapshot("snapshot-resync", []);
+      lastBufferLengthRef.current = 0;
+      lastOutputVersionRef.current = 0;
+    }
+  }, [
+    agentId,
+    outputBuffer,
+    outputVersion,
+    terminalReady,
+    restoreFromSnapshot,
+    resetWriteQueue,
+  ]);
+
+  // Apply live append-only output updates.
+  useEffect(() => {
+    const terminal = terminalInstanceRef.current;
+    if (!terminal || isDisposedRef.current || !terminalReady) return;
+    if (currentAgentIdRef.current !== agentId) return;
+
+    const hadNoDataBefore = lastBufferLengthRef.current === 0;
+    if (outputVersion > lastOutputVersionRef.current) {
+      if (lastOutputChunk) {
+        enqueueBuffer([lastOutputChunk]);
+        diagnosticsRef.current.liveChunksWritten += 1;
+
+        if (TERMINAL_DEBUG) {
+          console.debug("[TerminalView] live append", {
+            agentId,
+            chunkLength: lastOutputChunk.length,
+            outputVersion,
+            diagnostics: diagnosticsRef.current,
+          });
         }
+      } else if (outputBuffer.length > 0) {
+        restoreFromSnapshot("fallback-resync", outputBuffer);
       }
+
       lastBufferLengthRef.current = outputBuffer.length;
+      lastOutputVersionRef.current = outputVersion;
     }
 
     // Fit on first data (buffer just became non-empty)
-    if (outputBuffer.length > 0 && lastBufferLengthRef.current === 0) {
+    if (hadNoDataBefore && outputBuffer.length > 0) {
       requestAnimationFrame(() => {
         safeFit();
       });
     }
-  }, [agentId, outputVersion, terminalReady, safeFit]);
+  }, [
+    agentId,
+    lastOutputChunk,
+    outputBuffer,
+    outputVersion,
+    terminalReady,
+    safeFit,
+    enqueueBuffer,
+    restoreFromSnapshot,
+  ]);
 
-  // Update terminal settings
+  // Update terminal settings (xterm.js supports dynamic options updates)
   useEffect(() => {
-    if (terminalInstanceRef.current && !isDisposedRef.current) {
-      // Note: ghostty-web may not support dynamic option updates
-      // The terminal may need to be recreated for font changes
+    const terminal = terminalInstanceRef.current;
+    if (terminal && !isDisposedRef.current) {
+      terminal.options.fontSize = fontSize;
+      terminal.options.fontFamily = fontFamily;
+      terminal.options.cursorStyle = cursorStyle;
+      terminal.options.cursorBlink = cursorBlink;
       safeFit();
     }
   }, [fontSize, fontFamily, cursorStyle, cursorBlink, safeFit]);
 
-  // Update terminal theme when effective theme changes
+  // Update terminal theme when effective theme changes (xterm.js supports dynamic theme updates)
   useEffect(() => {
-    if (terminalInstanceRef.current && !isDisposedRef.current) {
-      // Note: ghostty-web may not support dynamic theme updates
-      // This may require terminal recreation
+    const terminal = terminalInstanceRef.current;
+    if (terminal && !isDisposedRef.current) {
+      terminal.options.theme = getTerminalTheme(effectiveTheme === "dark");
     }
   }, [effectiveTheme]);
 

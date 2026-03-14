@@ -1,4 +1,4 @@
-import type { ITheme } from "ghostty-web";
+import type { ITheme } from "@xterm/xterm";
 
 /**
  * Dark theme colors for the terminal

@@ -86,50 +86,62 @@
   transition-duration: 0.01ms !important;
 }
 
-/* ghostty-web terminal customization */
-.ghostty-terminal {
+/* xterm.js terminal styling */
+.xterm {
   padding: 0;
-  background: transparent;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  height: 100%;
 }
 
-/* Terminal container wrapper - provides padding and visual styling */
+.xterm-screen {
+  padding: 0;
+}
+
+/* Terminal container wrapper - glassmorphism with depth */
 .terminal-container {
   padding: 12px;
-  border-radius: 8px;
-  background: hsl(var(--background));
+  border-radius: 0;
+  background: hsl(var(--background) / 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid hsl(var(--border) / 0.5);
+  box-shadow:
+    0 4px 24px hsl(var(--foreground) / 0.08),
+    0 1px 2px hsl(var(--foreground) / 0.04),
+    inset 0 1px 0 hsl(var(--foreground) / 0.03);
   overflow: hidden;
 }
 
-/* Canvas element styling */
-.ghostty-terminal canvas {
-  border-radius: 0;
+/* Light mode adjustments for terminal container */
+.light .terminal-container {
+  background: hsl(var(--background) / 0.7);
+  box-shadow:
+    0 4px 24px hsl(var(--foreground) / 0.06),
+    0 1px 2px hsl(var(--foreground) / 0.03),
+    inset 0 1px 0 hsl(var(--foreground) / 0.05);
 }
 
 /* Viewport/scrollback styling */
-.ghostty-viewport {
+.xterm-viewport {
   background-color: transparent !important;
   border-radius: 0;
 }
 
 /* Scrollbar styling */
-.ghostty-viewport::-webkit-scrollbar {
+.xterm-viewport::-webkit-scrollbar {
   width: 8px;
 }
 
-.ghostty-viewport::-webkit-scrollbar-track {
+.xterm-viewport::-webkit-scrollbar-track {
   background: transparent;
   border-radius: 4px;
 }
 
-.ghostty-viewport::-webkit-scrollbar-thumb {
+.xterm-viewport::-webkit-scrollbar-thumb {
   background: hsl(var(--muted-foreground) / 0.25);
   border-radius: 4px;
 }
 
-.ghostty-viewport::-webkit-scrollbar-thumb:hover {
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.4);
 }
 

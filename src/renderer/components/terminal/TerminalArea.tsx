@@ -68,7 +68,7 @@ export function TerminalArea({
       <div className="flex flex-col h-full overflow-hidden">
         {/* Search bar */}
         <TerminalSearch
-          searchAddon={null}
+          searchAddon={terminalRef.current?.getSearchAddon() ?? null}
           isOpen={isSearchOpen}
           onClose={handleCloseSearch}
         />
@@ -81,6 +81,7 @@ export function TerminalArea({
             agentId={activeAgent.id}
             outputBuffer={activeAgent.outputBuffer}
             outputVersion={activeAgent.outputVersion}
+            lastOutputChunk={activeAgent.lastOutputChunk}
             onInput={handleInput}
             onResize={handleResize}
             fontSize={fontSize}
@@ -93,8 +94,8 @@ export function TerminalArea({
           />
         </div>
 
-        {/* Status bar with statusline badge */}
-        <div className="flex items-center justify-between px-2 py-1 border-t border-border bg-background/50">
+        {/* Status bar with statusline badge - glassmorphism footer */}
+        <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/50 bg-background/60 backdrop-blur-sm">
           <StatuslineBadge agentId={activeAgent.id} />
         </div>
 
