@@ -37,7 +37,12 @@ jobs:
 
       - name: Upload to Release
         if: github.event_name == 'release'
-        run: gh release upload ${{ github.event.release.tag_name }} release/* --clobber
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} \
+            release/*.AppImage \
+            release/*.deb \
+            release/*.rpm \
+            --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -70,6 +75,10 @@ jobs:
 
       - name: Upload to Release
         if: github.event_name == 'release'
-        run: gh release upload ${{ github.event.release.tag_name }} release/* --clobber
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} \
+            release/*.exe \
+            release/*.blockmap \
+            --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
