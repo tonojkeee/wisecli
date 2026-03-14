@@ -1,5 +1,5 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, shell, dialog } from "electron";
-import { join, dirname } from "path";
+import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { agentProcessManager } from "./services/AgentProcessManager";
 import { registerAgentHandlers } from "./ipc/agentHandlers";
@@ -76,8 +76,8 @@ function createSplashWindow(): BrowserWindow {
     });
   } else {
     // In production, extraResources are copied to resources/ directory
-    // __dirname is out/main/, so we go up to resources/
-    const resourcesPath = join(dirname(__dirname), "../resources/splash/splash.html");
+    // process.resourcesPath points to the resources/ folder outside app.asar
+    const resourcesPath = join(process.resourcesPath, "splash/splash.html");
     splashWindow.loadFile(resourcesPath, { query: { version } });
   }
 
@@ -89,10 +89,8 @@ function createSplashWindow(): BrowserWindow {
 }
 
 function createWindow(): void {
-  // Determine preload path based on environment
-  const preloadPath = is.dev
-    ? join(__dirname, "../preload/index.mjs")
-    : join(__dirname, "../preload/index.js");
+  // Preload script is always built as .mjs (ES Module) by electron-vite
+  const preloadPath = join(__dirname, "../preload/index.mjs");
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -262,10 +260,17 @@ app.whenReady().then(() => {
   // App user model id for Windows
   electronApp.setAppUserModelId("com.wisecli.app");
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production
+  // Handle F12 for DevTools in both development and production
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
+
+    // Enable F12 for DevTools in production as well
+    window.webContents.on("before-input-event", (event, input) => {
+      if (input.key === "F12") {
+        window.webContents.toggleDevTools();
+        event.preventDefault();
+      }
+    });
   });
 
   // Show splash screen first
