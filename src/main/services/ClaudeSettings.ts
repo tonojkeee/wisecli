@@ -2,38 +2,23 @@ import { app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 
-export interface ClaudeEnvSettings {
-  ANTHROPIC_AUTH_TOKEN?: string;
-  ANTHROPIC_BASE_URL?: string;
-  API_TIMEOUT_MS?: string;
-  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC?: string;
-  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS?: string;
-  ANTHROPIC_DEFAULT_HAIKU_MODEL?: string;
-  ANTHROPIC_DEFAULT_SONNET_MODEL?: string;
-  ANTHROPIC_DEFAULT_OPUS_MODEL?: string;
-  [key: string]: string | undefined;
-}
+// Import shared types for consistency across main/renderer/preload
+import type {
+  ClaudeSettings,
+  ClaudeEnvSettings,
+  ClaudeHook,
+  StatusLineSettings,
+  ClaudeHookMatcher,
+} from "@shared/types";
 
-export interface ClaudeHook {
-  type: "command";
-  command: string;
-}
-
-export interface StatusLineSettings {
-  type: "command";
-  command: string;
-}
-
-export interface ClaudeSettings {
-  env: ClaudeEnvSettings;
-  enabledPlugins?: Record<string, boolean>;
-  extraKnownMarketplaces?: Record<string, unknown>;
-  skipDangerousModePermissionPrompt?: boolean;
-  hooks?: Record<string, Array<{ matcher: string; hooks: ClaudeHook[] }>>;
-  /** StatusLine hook configuration - receives full statusline data from Claude Code */
-  statusLine?: StatusLineSettings | null;
-  [key: string]: unknown;
-}
+// Re-export types for backward compatibility with local imports
+export type {
+  ClaudeSettings,
+  ClaudeEnvSettings,
+  ClaudeHook,
+  StatusLineSettings,
+  ClaudeHookMatcher,
+} from "@shared/types";
 
 class ClaudeSettingsManager {
   private settingsPath: string;
@@ -78,7 +63,19 @@ class ClaudeSettingsManager {
   save(settings: ClaudeSettings): boolean {
     try {
       this.ensureSettingsDir();
-      fs.writeFileSync(this.settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+      const tempPath = this.settingsPath + ".tmp";
+
+      // Write to temporary file first
+      fs.writeFileSync(tempPath, JSON.stringify(settings, null, 2), "utf-8");
+
+      // Atomic rename on Linux/macOS, copy+delete on Windows
+      if (process.platform === "win32") {
+        fs.copyFileSync(tempPath, this.settingsPath);
+        fs.unlinkSync(tempPath);
+      } else {
+        fs.renameSync(tempPath, this.settingsPath);
+      }
+
       this.settings = settings;
       return true;
     } catch (error) {

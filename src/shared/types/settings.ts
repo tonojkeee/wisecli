@@ -88,9 +88,49 @@ export interface ClaudeEnvSettings {
   [key: string]: string | undefined;
 }
 
+/**
+ * Claude hook configuration for a single hook
+ */
+export interface ClaudeHook {
+  type: "command";
+  command: string;
+}
+
+/**
+ * StatusLine hook configuration - receives full statusline data from Claude Code
+ */
+export interface StatusLineSettings {
+  type: "command";
+  command: string;
+}
+
+/**
+ * Attribution settings for commits and PRs
+ */
+export interface ClaudeAttributionSettings {
+  commit?: string;
+  pr?: string;
+}
+
+/**
+ * Hook matcher configuration
+ */
+export interface ClaudeHookMatcher {
+  matcher: string;
+  hooks: ClaudeHook[];
+}
+
 export interface ClaudeSettings {
   env: ClaudeEnvSettings;
   enabledPlugins?: Record<string, boolean>;
   extraKnownMarketplaces?: Record<string, unknown>;
   skipDangerousModePermissionPrompt?: boolean;
+  /** Hook configurations keyed by hook type (e.g., 'PostToolUse') */
+  hooks?: Record<string, ClaudeHookMatcher[]>;
+  /** StatusLine hook configuration - receives full statusline data from Claude Code */
+  statusLine?: StatusLineSettings | null;
+  /** Attribution settings for commits and PRs */
+  attribution?: ClaudeAttributionSettings;
+  /** Allow additional fields for future compatibility */
+  [key: string]: unknown;
 }

@@ -91,6 +91,11 @@
   padding: 8px;
 }
 
+/* Fix black border around terminal - make viewport background transparent */
+.xterm-viewport {
+  background-color: transparent !important;
+}
+
 .xterm-viewport::-webkit-scrollbar {
   width: 8px;
 }
