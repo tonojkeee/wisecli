@@ -1,6 +1,6 @@
 {
   "name": "wisecli",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Desktop GUI for Claude CLI - Multi-agent management with real-time monitoring",
   "author": {
     "name": "WiseCLI",
