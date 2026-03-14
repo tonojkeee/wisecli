@@ -35,19 +35,19 @@ jobs:
       - name: Build Electron app
         run: pnpm exec electron-builder --linux --x64 --publish never
 
-      - name: List files
-        run: ls -la release/
-
-      - name: Upload to Release
+      - name: Upload Linux files to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*
-          fail_on_unmatched_files: false
+          files: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-windows:
+    needs: build-linux
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -73,14 +73,12 @@ jobs:
       - name: Build Electron app
         run: pnpm exec electron-builder --win --x64 --publish never
 
-      - name: List files
-        run: ls release/
-
-      - name: Upload to Release
+      - name: Upload Windows files to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*
-          fail_on_unmatched_files: false
+          files: |
+            release/*.exe
+            release/*.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
