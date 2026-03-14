@@ -20,6 +20,9 @@ export default defineConfig({
           // Only externalize native modules that can't be bundled
           "node-pty",
           "electron",
+          // Optional peer dependencies of ws - externalized to allow graceful fallback
+          "bufferutil",
+          "utf-8-validate",
         ],
       },
     },
