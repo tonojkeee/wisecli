@@ -6,7 +6,8 @@ const sharedAlias = { "@shared": resolve(__dirname, "src/shared") };
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // Don't externalize deps - bundle them into the output
+    // This fixes the issue with missing packages in production
     resolve: {
       alias: sharedAlias,
     },
@@ -15,6 +16,11 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, "src/main/index.ts"),
         },
+        external: [
+          // Only externalize native modules that can't be bundled
+          "node-pty",
+          "electron",
+        ],
       },
     },
   },
