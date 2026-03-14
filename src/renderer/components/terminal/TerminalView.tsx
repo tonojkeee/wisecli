@@ -302,15 +302,35 @@ export const TerminalView = ({
       bufferLength: outputBuffer.length,
     });
 
-    // Handle agent switch - clear terminal and reset tracking, then return early
+    // Handle agent switch - clear terminal, write entire buffer of new agent
     if (isAgentSwitch) {
       terminal.clear();
       currentAgentIdRef.current = agentId;
-      // Set to current buffer length so we only write NEW data after the switch
-      // This prevents reading stale data from the old agent's buffer
-      lastBufferLengthRef.current = outputBuffer.length;
 
-      logger.debug("[TERMINAL] agent switch complete, bufferLength set to:", outputBuffer.length);
+      // Write the ENTIRE buffer for the new agent (using prop directly, not ref)
+      if (outputBuffer.length > 0) {
+        const allData = outputBuffer.join("");
+        logger.debug(
+          "[TERMINAL] agent switch, writing full buffer:",
+          agentId.slice(0, 8),
+          "items:",
+          outputBuffer.length,
+          "dataLen:",
+          allData.length
+        );
+        if (allData && !isDisposedRef.current) {
+          try {
+            terminal.write(allData);
+          } catch {
+            // Terminal may have been disposed
+          }
+        }
+      } else {
+        logger.debug("[TERMINAL] agent switch, buffer empty:", agentId.slice(0, 8));
+      }
+
+      // Set to current buffer length so we only write NEW data after this
+      lastBufferLengthRef.current = outputBuffer.length;
 
       // Fit terminal after agent switch - single debounced fit
       if (fitTimeoutRef.current) {
