@@ -2,6 +2,11 @@
   "name": "wisecli",
   "version": "0.1.0",
   "description": "Desktop GUI for Claude CLI - Multi-agent management with real-time monitoring",
+  "author": {
+    "name": "WiseCLI",
+    "email": "wisecli@example.com"
+  },
+  "license": "MIT",
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
