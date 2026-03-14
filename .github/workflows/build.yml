@@ -19,12 +19,41 @@ jobs:
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    outputs:
+      release-tag: ${{ github.ref_name }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          CURRENT_TAG=${{ github.ref_name }}
+
+          # Generate changelog
+          if [ -n "$PREV_TAG" ]; then
+            echo "## What's Changed" > changelog.md
+            echo "" >> changelog.md
+            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges >> changelog.md
+          else
+            echo "## Initial Release" > changelog.md
+            echo "" >> changelog.md
+            git log --pretty=format:"- %s (%h)" --no-merges -20 >> changelog.md
+          fi
+
+          echo "" >> changelog.md
+          echo "" >> changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${CURRENT_TAG}" >> changelog.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: WiseCLI ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: changelog.md
           draft: false
           prerelease: false
         env:
