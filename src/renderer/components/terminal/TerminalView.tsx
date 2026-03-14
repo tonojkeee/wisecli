@@ -285,9 +285,9 @@ export const TerminalView = ({
   }, [containerReady]);
 
   // Handle agent switching and output buffer updates
-  // Depend on agentId, outputBuffer (by reference), and containerReady
-  // CRITICAL: Use outputBuffer prop directly, NOT a ref, to avoid race conditions
-  // during agent switching where refs may still point to the old agent's data
+  // CRITICAL: Only depend on outputVersion, NOT outputBuffer (array reference changes)
+  // outputVersion increments whenever buffer content changes, which is what we need
+  // We access outputBuffer inside the effect but don't need to depend on its reference
   useEffect(() => {
     const terminal = xtermRef.current;
     if (!terminal || isDisposedRef.current || !containerReady) return;
@@ -390,7 +390,7 @@ export const TerminalView = ({
         safeFit();
       });
     }
-  }, [agentId, outputBuffer, outputVersion, containerReady, safeFit]);
+  }, [agentId, outputVersion, containerReady, safeFit]);
 
   // Update terminal settings
   useEffect(() => {
