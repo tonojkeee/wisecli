@@ -40,97 +40,105 @@ export function AlertDialog({ open: controlledOpen, onOpenChange, children }: Al
 // Trigger button
 interface AlertDialogTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
-export const AlertDialogTrigger = React.forwardRef<HTMLButtonElement, AlertDialogTriggerProps>(
-  ({ asChild, children, onClick, ...props }, ref) => {
-    const { onOpenChange } = useAlertDialogContext();
+export const AlertDialogTrigger = ({
+  asChild,
+  children,
+  onClick,
+  ref,
+  ...props
+}: AlertDialogTriggerProps) => {
+  const { onOpenChange } = useAlertDialogContext();
 
-    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      onOpenChange(true);
-      onClick?.(e);
-    };
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    onOpenChange(true);
+    onClick?.(e);
+  };
 
-    if (asChild && React.isValidElement(children)) {
-      return React.cloneElement(children as React.ReactElement<{ onClick?: typeof handleClick }>, {
-        onClick: handleClick,
-      });
-    }
-
-    return (
-      <button ref={ref} onClick={handleClick} {...props}>
-        {children}
-      </button>
-    );
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement<{ onClick?: typeof handleClick }>, {
+      onClick: handleClick,
+    });
   }
-);
-AlertDialogTrigger.displayName = "AlertDialogTrigger";
+
+  return (
+    <button ref={ref} onClick={handleClick} {...props}>
+      {children}
+    </button>
+  );
+};
 
 // Modal content wrapper
 interface AlertDialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
   onOpenAutoFocus?: (e: Event) => void;
   onCloseAutoFocus?: (e: Event) => void;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-export const AlertDialogContent = React.forwardRef<HTMLDivElement, AlertDialogContentProps>(
-  ({ className, children, onOpenAutoFocus, onCloseAutoFocus, ...props }, ref) => {
-    const { open, onOpenChange } = useAlertDialogContext();
-    const contentRef = React.useRef<HTMLDivElement>(null);
+export const AlertDialogContent = ({
+  className,
+  children,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
+  ref,
+  ...props
+}: AlertDialogContentProps) => {
+  const { open, onOpenChange } = useAlertDialogContext();
+  const contentRef = React.useRef<HTMLDivElement>(null);
 
-    // Merge refs
-    React.useImperativeHandle(ref, () => contentRef.current as HTMLDivElement, []);
+  React.useImperativeHandle(ref, () => contentRef.current as HTMLDivElement, []);
 
-    React.useEffect(() => {
-      if (open) {
-        // Focus trap and auto-focus
-        onOpenAutoFocus?.(new Event("focus"));
-        contentRef.current?.focus();
-      } else {
-        onCloseAutoFocus?.(new Event("focus"));
+  React.useEffect(() => {
+    if (open) {
+      // Focus trap and auto-focus
+      onOpenAutoFocus?.(new Event("focus"));
+      contentRef.current?.focus();
+    } else {
+      onCloseAutoFocus?.(new Event("focus"));
+    }
+  }, [open, onOpenAutoFocus, onCloseAutoFocus]);
+
+  // Handle escape key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) {
+        onOpenChange(false);
       }
-    }, [open, onOpenAutoFocus, onCloseAutoFocus]);
+    };
 
-    // Handle escape key
-    React.useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === "Escape" && open) {
-          onOpenChange(false);
-        }
-      };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onOpenChange]);
 
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [open, onOpenChange]);
+  if (!open) return null;
 
-    if (!open) return null;
-
-    return (
-      <div className="fixed inset-0 z-50">
-        {/* Overlay */}
-        <div
-          className="fixed inset-0 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-          onClick={() => onOpenChange(false)}
-          aria-hidden="true"
-        />
-        {/* Content */}
-        <div
-          ref={contentRef}
-          role="alertdialog"
-          aria-modal="true"
-          tabIndex={-1}
-          className={cn(
-            "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-            className
-          )}
-          {...props}
-        >
-          {children}
-        </div>
+  return (
+    <div className="fixed inset-0 z-50">
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        onClick={() => onOpenChange(false)}
+        aria-hidden="true"
+      />
+      {/* Content */}
+      <div
+        ref={contentRef}
+        role="alertdialog"
+        aria-modal="true"
+        tabIndex={-1}
+        className={cn(
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+          className
+        )}
+        {...props}
+      >
+        {children}
       </div>
-    );
-  }
-);
-AlertDialogContent.displayName = "AlertDialogContent";
+    </div>
+  );
+};
 
 // Header
 export function AlertDialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -170,44 +178,50 @@ export function AlertDialogDescription({
 // Action button (confirm)
 interface AlertDialogActionProps extends ButtonProps {
   asChild?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
-export const AlertDialogAction = React.forwardRef<HTMLButtonElement, AlertDialogActionProps>(
-  ({ className, onClick, ...props }, ref) => {
-    const { onOpenChange } = useAlertDialogContext();
+export const AlertDialogAction = ({
+  className,
+  onClick,
+  ref,
+  ...props
+}: AlertDialogActionProps) => {
+  const { onOpenChange } = useAlertDialogContext();
 
-    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      // Call onClick first (for useConfirm to resolve with true)
-      // before onOpenChange which might trigger handleCancel
-      onClick?.(e);
-      onOpenChange(false);
-    };
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Call onClick first (for useConfirm to resolve with true)
+    // before onOpenChange which might trigger handleCancel
+    onClick?.(e);
+    onOpenChange(false);
+  };
 
-    return <Button ref={ref} className={className} onClick={handleClick} {...props} />;
-  }
-);
-AlertDialogAction.displayName = "AlertDialogAction";
+  return <Button ref={ref} className={className} onClick={handleClick} {...props} />;
+};
 
 // Cancel button
 interface AlertDialogCancelProps extends ButtonProps {
   asChild?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
-export const AlertDialogCancel = React.forwardRef<HTMLButtonElement, AlertDialogCancelProps>(
-  ({ className, onClick, ...props }, ref) => {
-    const { onOpenChange } = useAlertDialogContext();
+export const AlertDialogCancel = ({
+  className,
+  onClick,
+  ref,
+  ...props
+}: AlertDialogCancelProps) => {
+  const { onOpenChange } = useAlertDialogContext();
 
-    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      onOpenChange(false);
-      onClick?.(e);
-    };
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    onOpenChange(false);
+    onClick?.(e);
+  };
 
-    return (
-      <Button ref={ref} variant="outline" className={className} onClick={handleClick} {...props} />
-    );
-  }
-);
-AlertDialogCancel.displayName = "AlertDialogCancel";
+  return (
+    <Button ref={ref} variant="outline" className={className} onClick={handleClick} {...props} />
+  );
+};
 
 // Hook for imperative usage
 interface ConfirmOptions {

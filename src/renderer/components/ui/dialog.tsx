@@ -20,23 +20,22 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   );
 }
 
-type DialogContentProps = React.HTMLAttributes<HTMLDivElement>;
+type DialogContentProps = React.HTMLAttributes<HTMLDivElement> & {
+  ref?: React.Ref<HTMLDivElement>;
+};
 
-export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
-  ({ className, children, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "relative grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  )
+export const DialogContent = ({ className, children, ref, ...props }: DialogContentProps) => (
+  <div
+    ref={ref}
+    className={cn(
+      "relative grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
+      className
+    )}
+    {...props}
+  >
+    {children}
+  </div>
 );
-DialogContent.displayName = "DialogContent";
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (

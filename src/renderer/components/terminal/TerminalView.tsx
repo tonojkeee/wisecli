@@ -1,11 +1,4 @@
-import React, {
-  useEffect,
-  useRef,
-  useCallback,
-  useState,
-  useImperativeHandle,
-  forwardRef,
-} from "react";
+import React, { useEffect, useRef, useCallback, useState, useImperativeHandle } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -57,6 +50,7 @@ interface TerminalViewProps {
   rightClickPaste?: boolean;
   className?: string;
   onSearchOpen?: () => void;
+  ref?: React.Ref<TerminalViewRef>;
 }
 
 export interface TerminalViewRef {
@@ -78,24 +72,22 @@ function getDefaultFontFamily(): string {
   return "JetBrains Mono, Menlo, Monaco, Courier New, monospace";
 }
 
-export const TerminalView = forwardRef<TerminalViewRef, TerminalViewProps>(function TerminalView(
-  {
-    agentId,
-    outputBuffer,
-    outputVersion,
-    onInput,
-    onResize,
-    fontSize = 14,
-    fontFamily = getDefaultFontFamily(),
-    cursorStyle = "block",
-    cursorBlink = true,
-    copyOnSelect = false,
-    rightClickPaste = true,
-    className,
-    onSearchOpen,
-  },
-  ref
-) {
+export const TerminalView = ({
+  agentId,
+  outputBuffer,
+  outputVersion,
+  onInput,
+  onResize,
+  fontSize = 14,
+  fontFamily = getDefaultFontFamily(),
+  cursorStyle = "block",
+  cursorBlink = true,
+  copyOnSelect = false,
+  rightClickPaste = true,
+  className,
+  onSearchOpen,
+  ref,
+}: TerminalViewProps) => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -246,7 +238,7 @@ export const TerminalView = forwardRef<TerminalViewRef, TerminalViewProps>(funct
       }
 
       // Ctrl+F / Cmd+F = Open search
-      const isFindShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f";
+      const isFindShortcut = (event.ctrlKey || event.metaKey) && event.key.toUpperCase() === "F";
       if (isFindShortcut) {
         onSearchOpen?.();
         return false; // Prevent default browser find
@@ -474,7 +466,7 @@ export const TerminalView = forwardRef<TerminalViewRef, TerminalViewProps>(funct
       <div ref={containerRef} className="h-full w-full" />
     </div>
   );
-});
+};
 
 // Hook for managing terminal lifecycle with agent
 export function useTerminalManager(agentId: string | null) {
