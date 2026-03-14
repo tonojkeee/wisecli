@@ -13,7 +13,10 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "electron-builder install-app-deps",
     "prepare": "husky",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "build:win": "pnpm build && electron-builder --win --x64",
+    "build:linux": "pnpm build && electron-builder --linux --x64",
+    "build:all": "pnpm build && electron-builder --win --linux --x64"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
@@ -79,17 +82,41 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
+      "out/**/*",
       "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/node-pty/prebuilds",
+        "to": "node_modules/node-pty/prebuilds"
+      },
+      {
+        "from": "src/main/splash",
+        "to": "splash"
+      }
     ],
     "mac": {
       "category": "public.app-category.developer-tools"
     },
     "linux": {
-      "category": "Development"
+      "category": "Development",
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ]
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   },
   "lint-staged": {

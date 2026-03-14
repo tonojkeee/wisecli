@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WiseCLI</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --background: #0a0a0a;
+      --foreground: #fafafa;
+      --muted: #262626;
+      --muted-foreground: #737373;
+      --border: #262626;
+      --primary: #fafafa;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.4);
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: var(--background);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--foreground);
+      user-select: none;
+      -webkit-app-region: drag;
+      position: relative;
+    }
+
+    /* Decorative gradient orbs */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    .orb-1 {
+      width: 200px;
+      height: 200px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      top: -60px;
+      right: -40px;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    .orb-2 {
+      width: 150px;
+      height: 150px;
+      background: linear-gradient(135deg, #10b981, #3b82f6);
+      bottom: -40px;
+      left: -30px;
+      animation: float 8s ease-in-out infinite reverse;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(10px, -10px) scale(1.1); }
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      animation: fadeIn 0.4s ease-out;
+      z-index: 1;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .logo-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* Glow ring around logo */
+    .logo-glow {
+      position: absolute;
+      width: 64px;
+      height: 64px;
+      left: -8px;
+      top: -8px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6, #10b981);
+      opacity: 0.2;
+      filter: blur(12px);
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.2; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.1); }
+    }
+
+    .logo-icon {
+      width: 48px;
+      height: 48px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-icon svg {
+      width: 100%;
+      height: 100%;
+      color: var(--foreground);
+    }
+
+    .logo-text {
+      font-size: 34px;
+      font-weight: 700;
+      color: var(--foreground);
+      letter-spacing: -1px;
+      position: relative;
+    }
+
+    .logo-text span {
+      background: linear-gradient(135deg, #ffffff 0%, #a3a3a3 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .tagline {
+      font-size: 11px;
+      color: var(--muted-foreground);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-top: -8px;
+      font-weight: 500;
+    }
+
+    .loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      margin-top: 12px;
+    }
+
+    /* Animated dots loader */
+    .dots-loader {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: bounce 1.4s ease-in-out infinite;
+    }
+
+    .dot:nth-child(1) { animation-delay: 0s; }
+    .dot:nth-child(2) { animation-delay: 0.16s; }
+    .dot:nth-child(3) { animation-delay: 0.32s; }
+    .dot:nth-child(4) { animation-delay: 0.48s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+      }
+      40% {
+        transform: scale(1.2);
+        opacity: 1;
+      }
+    }
+
+    .loading-text {
+      font-size: 12px;
+      color: var(--muted-foreground);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: var(--accent);
+      animation: blink 1s step-end infinite;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .version {
+      position: absolute;
+      bottom: 16px;
+      font-size: 10px;
+      color: var(--muted-foreground);
+      opacity: 0.5;
+      letter-spacing: 0.5px;
+    }
+
+    /* Subtle border glow */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), transparent, rgba(139, 92, 246, 0.2));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="container">
+    <div class="logo-wrapper">
+      <div class="logo-glow"></div>
+      <div class="logo-icon">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Terminal window -->
+          <rect x="3" y="5" width="42" height="38" rx="8" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <!-- Title bar -->
+          <rect x="3" y="5" width="42" height="12" rx="8" fill="currentColor" opacity="0.05"/>
+          <!-- Window buttons -->
+          <circle cx="12" cy="11" r="3" fill="#ff5f57"/>
+          <circle cx="22" cy="11" r="3" fill="#febc2e"/>
+          <circle cx="32" cy="11" r="3" fill="#28c840"/>
+          <!-- Command prompt -->
+          <text x="10" y="32" font-family="SF Mono, Monaco, monospace" font-size="11" font-weight="600" fill="currentColor">&gt;_</text>
+          <!-- Animated cursor line -->
+          <rect x="26" y="26" width="14" height="2" rx="1" fill="#3b82f6">
+            <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/>
+          </rect>
+          <rect x="26" y="32" width="8" height="2" rx="1" fill="currentColor" opacity="0.3"/>
+        </svg>
+      </div>
+      <div class="logo-text"><span>WiseCLI</span></div>
+    </div>
+
+    <div class="tagline">AI-Powered Terminal</div>
+
+    <div class="loader">
+      <div class="dots-loader">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <div class="loading-text">
+        Loading<span class="cursor"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="version" id="version">v0.1.0</div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const version = params.get('version');
+    if (version) {
+      document.getElementById('version').textContent = `v${version}`;
+    }
+  </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, shell, dialog } from "electron";
-import { join } from "path";
+import { join, dirname } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { agentProcessManager } from "./services/AgentProcessManager";
 import { registerAgentHandlers } from "./ipc/agentHandlers";
@@ -49,6 +49,44 @@ registerTaskHandlers();
 registerChatHandlers();
 
 let mainWindow: BrowserWindow | null = null;
+let splashWindow: BrowserWindow | null = null;
+
+function createSplashWindow(): BrowserWindow {
+  splashWindow = new BrowserWindow({
+    width: 360,
+    height: 280,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  // Load splash HTML - different paths for dev and production
+  // Pass version as query parameter for dynamic display
+  const version = app.getVersion();
+  if (is.dev) {
+    // In dev, __dirname is out/main/, splash.html is in src/main/splash/
+    splashWindow.loadFile(join(__dirname, "../../src/main/splash/splash.html"), {
+      query: { version },
+    });
+  } else {
+    // In production, extraResources are copied to resources/ directory
+    // __dirname is out/main/, so we go up to resources/
+    const resourcesPath = join(dirname(__dirname), "../resources/splash/splash.html");
+    splashWindow.loadFile(resourcesPath, { query: { version } });
+  }
+
+  splashWindow.on("closed", () => {
+    splashWindow = null;
+  });
+
+  return splashWindow;
+}
 
 function createWindow(): void {
   // Determine preload path based on environment
@@ -99,6 +137,10 @@ function createWindow(): void {
   appSettingsManager.applyTheme();
 
   mainWindow.on("ready-to-show", () => {
+    // Close splash and show main window with fade effect
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.close();
+    }
     mainWindow?.show();
     // Apply zoom after window is shown
     appSettingsManager.applyZoom();
@@ -226,6 +268,10 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window);
   });
 
+  // Show splash screen first
+  createSplashWindow();
+
+  // Create main window (will be shown when ready)
   createWindow();
   registerGlobalShortcuts();
 
