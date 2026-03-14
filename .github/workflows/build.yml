@@ -9,18 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            platform: linux
-          - os: windows-latest
-            platform: win
-
-    runs-on: ${{ matrix.os }}
-
+  build-linux:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,23 +32,55 @@ jobs:
       - name: Build application
         run: pnpm build
 
-      - name: Build Electron app (Linux)
-        if: matrix.platform == 'linux'
+      - name: Build Electron app
         run: pnpm exec electron-builder --linux --x64 --publish never
 
-      - name: Build Electron app (Windows)
-        if: matrix.platform == 'win'
-        run: pnpm exec electron-builder --win --x64 --publish never
+      - name: List files
+        run: ls -la release/
 
       - name: Upload to Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release/*.AppImage
-            release/*.deb
-            release/*.rpm
-            release/*.exe
-            release/*.blockmap
+          files: release/*
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Build Electron app
+        run: pnpm exec electron-builder --win --x64 --publish never
+
+      - name: List files
+        run: ls release/
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
