@@ -92,7 +92,7 @@ export const TerminalView = ({
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
-  const lastOutputVersionRef = useRef(0);
+  const lastBufferLengthRef = useRef(0);
   const currentAgentIdRef = useRef<string | null>(null);
   const isDisposedRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -101,11 +101,11 @@ export const TerminalView = ({
   const effectiveTheme = useEffectiveTheme();
 
   // Keep refs updated to avoid stale closures in terminal callbacks
+  // Note: outputBuffer and outputVersion refs are NOT needed for effects -
+  // effects can use props directly. Refs are only needed for callbacks.
   const onInputRef = useRef(onInput);
   const onResizeRef = useRef(onResize);
-  const outputBufferRef = useRef(outputBuffer);
   const copyOnSelectRef = useRef(copyOnSelect);
-  const outputVersionRef = useRef(outputVersion);
 
   useEffect(() => {
     onInputRef.current = onInput;
@@ -114,14 +114,6 @@ export const TerminalView = ({
   useEffect(() => {
     onResizeRef.current = onResize;
   }, [onResize]);
-
-  useEffect(() => {
-    outputBufferRef.current = outputBuffer;
-  }, [outputBuffer]);
-
-  useEffect(() => {
-    outputVersionRef.current = outputVersion;
-  }, [outputVersion]);
 
   useEffect(() => {
     copyOnSelectRef.current = copyOnSelect;
@@ -293,8 +285,9 @@ export const TerminalView = ({
   }, [containerReady]);
 
   // Handle agent switching and output buffer updates
-  // Depend on agentId, outputVersion, and containerReady
-  // containerReady ensures terminal is initialized before writing
+  // Depend on agentId, outputBuffer (by reference), and containerReady
+  // CRITICAL: Use outputBuffer prop directly, NOT a ref, to avoid race conditions
+  // during agent switching where refs may still point to the old agent's data
   useEffect(() => {
     const terminal = xtermRef.current;
     if (!terminal || isDisposedRef.current || !containerReady) return;
@@ -305,58 +298,25 @@ export const TerminalView = ({
       agentId: agentId.slice(0, 8),
       isAgentSwitch,
       outputVersion,
-      lastVersion: lastOutputVersionRef.current,
-      bufferLength: outputBufferRef.current.length,
+      lastBufferLength: lastBufferLengthRef.current,
+      bufferLength: outputBuffer.length,
     });
 
-    // Handle agent switch
+    // Handle agent switch - clear terminal and reset tracking, then return early
     if (isAgentSwitch) {
       terminal.clear();
       currentAgentIdRef.current = agentId;
-      lastOutputVersionRef.current = 0;
-    }
+      // Set to current buffer length so we only write NEW data after the switch
+      // This prevents reading stale data from the old agent's buffer
+      lastBufferLengthRef.current = outputBuffer.length;
 
-    // Write new data using version comparison
-    // Version always increments, even when ring buffer wraps around
-    if (outputVersion > lastOutputVersionRef.current) {
-      // Calculate how many new items were added since last render
-      const itemsAdded = outputVersion - lastOutputVersionRef.current;
-      // Use ref to get buffer to avoid dependency on buffer reference
-      const buffer = outputBufferRef.current;
-      // Get only the newest items (they're at the end of the buffer array)
-      const startIndex = Math.max(0, buffer.length - itemsAdded);
-      const newData = buffer.slice(startIndex);
-      const combinedData = newData.join("");
+      logger.debug("[TERMINAL] agent switch complete, bufferLength set to:", outputBuffer.length);
 
-      logger.debug(
-        "[TERMINAL] write:",
-        agentId.slice(0, 8),
-        "version:",
-        outputVersion,
-        "itemsAdded:",
-        itemsAdded,
-        "dataLen:",
-        combinedData.length
-      );
-
-      if (combinedData && !isDisposedRef.current) {
-        try {
-          terminal.write(combinedData);
-        } catch {
-          // Terminal may have been disposed
-        }
-      }
-      lastOutputVersionRef.current = outputVersion;
-    }
-
-    // Fit terminal after agent switch - single debounced fit instead of multiple timeouts
-    if (isAgentSwitch) {
-      // Clear any existing fit timeout
+      // Fit terminal after agent switch - single debounced fit
       if (fitTimeoutRef.current) {
         clearTimeout(fitTimeoutRef.current);
       }
 
-      // Single fit with delay to ensure layout is complete
       fitTimeoutRef.current = setTimeout(() => {
         if (!isDisposedRef.current && fitAddonRef.current && xtermRef.current) {
           try {
@@ -377,13 +337,40 @@ export const TerminalView = ({
       };
     }
 
-    // Fit on first data
-    if (outputVersion > 0 && lastOutputVersionRef.current === 0) {
+    // Write only truly new data (buffer grew since last render)
+    // Use outputBuffer prop directly - it's always the correct agent's buffer
+    if (outputBuffer.length > lastBufferLengthRef.current) {
+      const newItems = outputBuffer.slice(lastBufferLengthRef.current);
+      const combinedData = newItems.join("");
+
+      logger.debug(
+        "[TERMINAL] write:",
+        agentId.slice(0, 8),
+        "from index:",
+        lastBufferLengthRef.current,
+        "to:",
+        outputBuffer.length,
+        "dataLen:",
+        combinedData.length
+      );
+
+      if (combinedData && !isDisposedRef.current) {
+        try {
+          terminal.write(combinedData);
+        } catch {
+          // Terminal may have been disposed
+        }
+      }
+      lastBufferLengthRef.current = outputBuffer.length;
+    }
+
+    // Fit on first data (buffer just became non-empty)
+    if (outputBuffer.length > 0 && lastBufferLengthRef.current === 0) {
       requestAnimationFrame(() => {
         safeFit();
       });
     }
-  }, [agentId, outputVersion, containerReady, safeFit]);
+  }, [agentId, outputBuffer, outputVersion, containerReady, safeFit]);
 
   // Update terminal settings
   useEffect(() => {
