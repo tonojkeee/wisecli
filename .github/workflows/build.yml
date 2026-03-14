@@ -50,51 +50,15 @@ jobs:
         if: matrix.platform == 'win'
         run: pnpm exec electron-builder --win --x64 --publish never
 
-      - name: Upload Linux artifacts
-        if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
         with:
-          name: linux-build
-          path: |
+          files: |
             release/*.AppImage
             release/*.deb
             release/*.rpm
-          retention-days: 1
-
-      - name: Upload Windows artifacts
-        if: matrix.platform == 'win'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: |
             release/*.exe
             release/*.blockmap
-          retention-days: 1
-
-  upload-release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-
-    steps:
-      - name: Download Linux artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-build
-          path: release/
-
-      - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-build
-          path: release/
-
-      - name: List files
-        run: ls -la release/
-
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
