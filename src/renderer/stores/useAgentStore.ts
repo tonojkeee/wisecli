@@ -73,13 +73,11 @@ class OutputBufferStore {
   }
 
   appendOutput(agentId: string, data: string): void {
-    logger.debug("[STORE] appendOutput:", agentId.slice(0, 8), data.length, "bytes");
     const buffer = this.getBuffer(agentId);
     buffer.push(data);
     // Increment version
     const newVersion = (this.versions.get(agentId) || 0) + 1;
     this.versions.set(agentId, newVersion);
-    logger.debug("[STORE] version now:", newVersion);
     // Invalidate caches
     this.cachedSnapshots.delete(agentId);
     this.cachedResults.delete(agentId);

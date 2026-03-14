@@ -7,3 +7,12 @@ release
 .env
 .env.*
 !.env.example
+
+# Local Claude settings
+.claude/
+
+# Local npm config
+.npmrc
+
+# Generated WASM files (copied by postinstall script)
+public/

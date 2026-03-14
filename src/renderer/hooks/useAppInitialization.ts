@@ -88,12 +88,6 @@ export function useAppInitialization() {
     ipcSubscriptionsActive = true;
 
     const unsubOutput = window.electronAPI.agent.onOutput((event) => {
-      logger.debug(
-        "[RENDERER] onOutput received:",
-        event.agentId.slice(0, 8),
-        event.data.length,
-        "bytes"
-      );
       // Use getState() to avoid closure dependency
       appendOutput(event.agentId, event.data);
     });

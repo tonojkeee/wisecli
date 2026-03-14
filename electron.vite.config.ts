@@ -48,15 +48,20 @@ export default defineConfig({
         ...sharedAlias,
       },
     },
+    publicDir: resolve(__dirname, "public"),
     build: {
       rollupOptions: {
         input: {
           index: resolve(__dirname, "src/renderer/index.html"),
         },
       },
+      target: "esnext",
     },
     optimizeDeps: {
       include: ["monaco-editor"],
+      esbuildOptions: {
+        target: "esnext",
+      },
     },
   },
 });

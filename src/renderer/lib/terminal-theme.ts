@@ -1,67 +1,73 @@
-import type { ITheme } from "@xterm/xterm";
+import type { ITheme } from "ghostty-web";
 
 /**
  * Dark theme colors for the terminal
- * Matches the existing hardcoded dark theme in TerminalView
+ * Matches the app's dark theme background with Tokyo Night-inspired ANSI colors
  */
 const darkTheme: ITheme = {
+  // Background matches app's --background: hsl(0, 0%, 3.9%)
   background: "#0a0a0a",
   foreground: "#fafafa",
   cursor: "#fafafa",
   cursorAccent: "#0a0a0a",
-  selectionBackground: "rgba(250, 250, 250, 0.3)",
+  selectionBackground: "rgba(122, 162, 247, 0.25)",
   selectionForeground: "#fafafa",
-  black: "#0a0a0a",
-  red: "#ff5f56",
-  green: "#27c93f",
-  yellow: "#ffbd2e",
-  blue: "#007aff",
-  magenta: "#af52de",
-  cyan: "#64d2ff",
-  white: "#fafafa",
-  brightBlack: "#6b6b6b",
-  brightRed: "#ff5f56",
-  brightGreen: "#27c93f",
-  brightYellow: "#ffbd2e",
-  brightBlue: "#007aff",
-  brightMagenta: "#af52de",
-  brightCyan: "#64d2ff",
+  // ANSI colors - Tokyo Night inspired palette for beautiful syntax highlighting
+  black: "#15161e",
+  red: "#f7768e",
+  green: "#9ece6a",
+  yellow: "#e0af68",
+  blue: "#7aa2f7",
+  magenta: "#bb9af7",
+  cyan: "#7dcfff",
+  white: "#a9b1d6",
+  // Bright ANSI colors
+  brightBlack: "#414868",
+  brightRed: "#ff6b6b",
+  brightGreen: "#73daca",
+  brightYellow: "#ffd866",
+  brightBlue: "#91b4fa",
+  brightMagenta: "#c678dd",
+  brightCyan: "#a9fff1",
   brightWhite: "#fafafa",
 };
 
 /**
  * Light theme colors for the terminal
- * Designed for readability with a clean, modern look
+ * Matches the app's light theme background with professional ANSI colors
  */
 const lightTheme: ITheme = {
+  // Background matches app's light --background: hsl(0, 0%, 100%)
   background: "#ffffff",
   foreground: "#1a1a1a",
   cursor: "#1a1a1a",
   cursorAccent: "#ffffff",
-  selectionBackground: "rgba(0, 0, 0, 0.15)",
+  selectionBackground: "rgba(36, 40, 59, 0.2)",
   selectionForeground: "#1a1a1a",
+  // ANSI colors - professional, muted palette
   black: "#1a1a1a",
-  red: "#d73a49",
+  red: "#d3405f",
   green: "#22863a",
   yellow: "#b08800",
   blue: "#005cc5",
   magenta: "#6f42c1",
   cyan: "#0094b3",
-  white: "#ffffff",
-  brightBlack: "#6b6b6b",
-  brightRed: "#d73a49",
-  brightGreen: "#22863a",
-  brightYellow: "#b08800",
-  brightBlue: "#005cc5",
-  brightMagenta: "#6f42c1",
-  brightCyan: "#0094b3",
-  brightWhite: "#ffffff",
+  white: "#6b6b6b",
+  // Bright ANSI colors
+  brightBlack: "#414868",
+  brightRed: "#f14c7e",
+  brightGreen: "#48bb78",
+  brightYellow: "#ecc94b",
+  brightBlue: "#61afef",
+  brightMagenta: "#b794f4",
+  brightCyan: "#22d3ee",
+  brightWhite: "#1a1a1a",
 };
 
 /**
  * Get the terminal theme based on the current color scheme
  * @param isDark - Whether to use the dark theme
- * @returns An ITheme object compatible with xterm.js
+ * @returns An ITheme object compatible with ghostty-web
  */
 export function getTerminalTheme(isDark: boolean): ITheme {
   return isDark ? darkTheme : lightTheme;

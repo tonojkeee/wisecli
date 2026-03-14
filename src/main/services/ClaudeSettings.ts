@@ -8,7 +8,6 @@ import type {
   ClaudeEnvSettings,
   ClaudeHook,
   StatusLineSettings,
-  ClaudeHookMatcher,
 } from "@shared/types";
 
 // Re-export types for backward compatibility with local imports

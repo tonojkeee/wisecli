@@ -1,40 +1,8 @@
 import React, { useEffect, useRef, useCallback, useState, useImperativeHandle } from "react";
-import { Terminal as XTerm } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { SearchAddon } from "@xterm/addon-search";
-import { WebLinksAddon } from "@xterm/addon-web-links";
-import {
-  ClipboardAddon,
-  ClipboardSelectionType,
-  type IClipboardProvider,
-} from "@xterm/addon-clipboard";
-import "@xterm/xterm/css/xterm.css";
+import { Terminal, FitAddon } from "ghostty-web";
 import { cn } from "@renderer/lib/utils";
-import { logger } from "@renderer/lib/logger";
 import { getTerminalTheme } from "@renderer/lib/terminal-theme";
 import { useEffectiveTheme } from "@renderer/stores/useSettingsStore";
-
-/**
- * Custom clipboard provider that uses Electron's clipboard API
- * for full system clipboard integration
- */
-class ElectronClipboardProvider implements IClipboardProvider {
-  async readText(_selection: ClipboardSelectionType): Promise<string> {
-    try {
-      return await window.electronAPI.clipboard.readText();
-    } catch {
-      return "";
-    }
-  }
-
-  async writeText(_selection: ClipboardSelectionType, text: string): Promise<void> {
-    try {
-      await window.electronAPI.clipboard.writeText(text);
-    } catch {
-      // Ignore clipboard errors
-    }
-  }
-}
 
 interface TerminalViewProps {
   agentId: string;
@@ -54,7 +22,10 @@ interface TerminalViewProps {
 }
 
 export interface TerminalViewRef {
-  getSearchAddon: () => SearchAddon | null;
+  focus: () => void;
+  getSelection: () => string;
+  hasSelection: () => boolean;
+  clearSelection: () => void;
   openSearch: () => void;
 }
 
@@ -89,23 +60,21 @@ export const TerminalView = ({
   ref,
 }: TerminalViewProps) => {
   const terminalRef = useRef<HTMLDivElement | null>(null);
-  const xtermRef = useRef<XTerm | null>(null);
+  const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const searchAddonRef = useRef<SearchAddon | null>(null);
   const lastBufferLengthRef = useRef(0);
   const currentAgentIdRef = useRef<string | null>(null);
   const isDisposedRef = useRef(false);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [containerReady, setContainerReady] = useState(false);
+  const [terminalReady, setTerminalReady] = useState(false);
   const fitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const effectiveTheme = useEffectiveTheme();
 
   // Keep refs updated to avoid stale closures in terminal callbacks
-  // Note: outputBuffer and outputVersion refs are NOT needed for effects -
-  // effects can use props directly. Refs are only needed for callbacks.
   const onInputRef = useRef(onInput);
   const onResizeRef = useRef(onResize);
   const copyOnSelectRef = useRef(copyOnSelect);
+  const onSearchOpenRef = useRef(onSearchOpen);
 
   useEffect(() => {
     onInputRef.current = onInput;
@@ -119,22 +88,45 @@ export const TerminalView = ({
     copyOnSelectRef.current = copyOnSelect;
   }, [copyOnSelect]);
 
-  // Expose search functionality via ref
+  useEffect(() => {
+    onSearchOpenRef.current = onSearchOpen;
+  }, [onSearchOpen]);
+
+  // Expose terminal functionality via ref
   useImperativeHandle(
     ref,
     () => ({
-      getSearchAddon: () => searchAddonRef.current,
-      openSearch: () => onSearchOpen?.(),
+      focus: () => {
+        if (terminalInstanceRef.current && !isDisposedRef.current) {
+          terminalInstanceRef.current.focus();
+        }
+      },
+      getSelection: () => {
+        if (terminalInstanceRef.current && !isDisposedRef.current) {
+          return terminalInstanceRef.current.getSelection();
+        }
+        return "";
+      },
+      hasSelection: () => {
+        if (terminalInstanceRef.current && !isDisposedRef.current) {
+          return terminalInstanceRef.current.hasSelection();
+        }
+        return false;
+      },
+      clearSelection: () => {
+        if (terminalInstanceRef.current && !isDisposedRef.current) {
+          terminalInstanceRef.current.clearSelection();
+        }
+      },
+      openSearch: () => onSearchOpenRef.current?.(),
     }),
-    [onSearchOpen]
+    []
   );
 
   // Safe fit function that checks if terminal is still valid
   const safeFit = useCallback(() => {
     if (isDisposedRef.current) return;
-    if (!fitAddonRef.current || !xtermRef.current) return;
-
-    const terminal = xtermRef.current;
+    if (!fitAddonRef.current || !terminalInstanceRef.current) return;
 
     // Check if container has valid dimensions
     if (terminalRef.current) {
@@ -145,8 +137,6 @@ export const TerminalView = ({
     }
 
     try {
-      // Refresh terminal state before fitting
-      terminal.refresh(0, terminal.rows - 1);
       fitAddonRef.current.fit();
     } catch {
       // Ignore fit errors - terminal may be disposed or not fully initialized
@@ -155,88 +145,53 @@ export const TerminalView = ({
 
   // Initialize terminal
   useEffect(() => {
-    if (!terminalRef.current || xtermRef.current || !containerReady) return;
+    if (!terminalRef.current || terminalInstanceRef.current || !containerReady) return;
 
     isDisposedRef.current = false;
 
-    const terminal = new XTerm({
+    const terminal = new Terminal({
       cursorBlink,
       cursorStyle,
       fontSize,
       fontFamily,
       theme: getTerminalTheme(effectiveTheme === "dark"),
-      allowProposedApi: true,
+      scrollback: 10000,
+      wasmPath: "ghostty-vt.wasm", // Path to WASM file in public directory
     });
 
     const fitAddon = new FitAddon();
-    const searchAddon = new SearchAddon();
-    const webLinksAddon = new WebLinksAddon((_event: MouseEvent, uri: string) => {
-      window.electronAPI.app.openExternal(uri);
-    });
-    const clipboardAddon = new ClipboardAddon(new ElectronClipboardProvider());
 
     terminal.loadAddon(fitAddon);
-    terminal.loadAddon(searchAddon);
-    terminal.loadAddon(webLinksAddon);
-    terminal.loadAddon(clipboardAddon);
 
-    terminal.open(terminalRef.current);
+    // Open terminal (async)
+    terminal
+      .open(terminalRef.current)
+      .then(() => {
+        if (isDisposedRef.current) return;
 
-    xtermRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-    searchAddonRef.current = searchAddon;
+        terminalInstanceRef.current = terminal;
+        fitAddonRef.current = fitAddon;
+        setTerminalReady(true);
 
-    // Handle input - use ref to avoid stale closure
-    // PTY handles echo, no local echo needed (standard xterm.js + node-pty pattern)
-    terminal.onData((data) => {
-      if (!isDisposedRef.current) {
-        // Send to PTY - it will echo back
-        onInputRef.current(data);
-      }
-    });
+        // Use built-in resize observation
+        fitAddon.observeResize();
 
-    // Copy on selection (optional feature)
-    terminal.onSelectionChange(() => {
-      if (!isDisposedRef.current && copyOnSelectRef.current) {
-        const selection = terminal.getSelection();
-        if (selection) {
-          window.electronAPI.clipboard.writeText(selection);
-        }
-      }
-    });
-
-    // Handle keyboard shortcuts for copy/paste (Ctrl+Shift+C/V)
-    // ClipboardAddon handles browser clipboard events, but we need explicit key handling for Electron
-    terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
-      if (isDisposedRef.current) return false;
-
-      // Ctrl+Shift+C = Copy selection to clipboard
-      if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === "C") {
-        const selection = terminal.getSelection();
-        if (selection) {
-          window.electronAPI.clipboard.writeText(selection);
-        }
-        return false; // Prevent default terminal handling
-      }
-
-      // Ctrl+Shift+V = Paste from clipboard
-      if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === "V") {
-        window.electronAPI.clipboard.readText().then((text) => {
-          if (text && !isDisposedRef.current && onInputRef.current) {
-            onInputRef.current(text);
+        // Initial fit
+        requestAnimationFrame(() => {
+          if (!isDisposedRef.current) {
+            safeFit();
           }
         });
-        return false; // Prevent default terminal handling
-      }
+      })
+      .catch((err) => {
+        console.error("Failed to open terminal:", err);
+      });
 
-      // Ctrl+F / Cmd+F = Open search
-      const isFindShortcut = (event.ctrlKey || event.metaKey) && event.key.toUpperCase() === "F";
-      if (isFindShortcut) {
-        onSearchOpen?.();
-        return false; // Prevent default browser find
+    // Handle input - use ref to avoid stale closure
+    terminal.onData((data) => {
+      if (!isDisposedRef.current) {
+        onInputRef.current(data);
       }
-
-      return true; // Allow other keys to be processed
     });
 
     // Handle resize - use ref to avoid stale closure
@@ -246,16 +201,15 @@ export const TerminalView = ({
       }
     });
 
-    // Use ResizeObserver to handle container size changes
-    resizeObserverRef.current = new ResizeObserver(() => {
-      // Check disposal before fitting
-      if (isDisposedRef.current) return;
-      safeFit();
+    // Handle selection change for copy on select
+    terminal.onSelectionChange(() => {
+      if (!isDisposedRef.current && copyOnSelectRef.current) {
+        const selection = terminal.getSelection();
+        if (selection) {
+          window.electronAPI.clipboard.writeText(selection);
+        }
+      }
     });
-
-    if (terminalRef.current) {
-      resizeObserverRef.current.observe(terminalRef.current);
-    }
 
     return () => {
       // Mark as disposed first to prevent any pending callbacks
@@ -267,57 +221,78 @@ export const TerminalView = ({
         fitTimeoutRef.current = null;
       }
 
-      // Disconnect observer before disposing terminal
-      if (resizeObserverRef.current) {
-        resizeObserverRef.current.disconnect();
-        resizeObserverRef.current = null;
-      }
-
       // Dispose terminal
-      if (xtermRef.current) {
-        xtermRef.current.dispose();
+      if (terminalInstanceRef.current) {
+        terminalInstanceRef.current.dispose();
       }
 
-      xtermRef.current = null;
+      terminalInstanceRef.current = null;
       fitAddonRef.current = null;
-      searchAddonRef.current = null;
+      setTerminalReady(false);
     };
-  }, [containerReady]);
+  }, [containerReady, safeFit]);
+
+  // Handle keyboard shortcuts via container events
+  useEffect(() => {
+    const container = terminalRef.current;
+    if (!container || !terminalReady) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isDisposedRef.current || !terminalInstanceRef.current) return;
+
+      const terminal = terminalInstanceRef.current;
+
+      // Ctrl+Shift+C = Copy selection to clipboard
+      if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === "C") {
+        const selection = terminal.getSelection();
+        if (selection) {
+          event.preventDefault();
+          window.electronAPI.clipboard.writeText(selection);
+        }
+        return;
+      }
+
+      // Ctrl+Shift+V = Paste from clipboard
+      if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === "V") {
+        event.preventDefault();
+        window.electronAPI.clipboard.readText().then((text) => {
+          if (text && !isDisposedRef.current && onInputRef.current) {
+            onInputRef.current(text);
+          }
+        });
+        return;
+      }
+
+      // Ctrl+F / Cmd+F = Open search
+      if ((event.ctrlKey || event.metaKey) && event.key.toUpperCase() === "F") {
+        event.preventDefault();
+        onSearchOpenRef.current?.();
+        return;
+      }
+    };
+
+    container.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      container.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [terminalReady]);
 
   // Handle agent switching and output buffer updates
-  // CRITICAL: Only depend on outputVersion, NOT outputBuffer (array reference changes)
-  // outputVersion increments whenever buffer content changes, which is what we need
-  // We access outputBuffer inside the effect but don't need to depend on its reference
   useEffect(() => {
-    const terminal = xtermRef.current;
-    if (!terminal || isDisposedRef.current || !containerReady) return;
+    const terminal = terminalInstanceRef.current;
+    if (!terminal || isDisposedRef.current || !terminalReady) return;
 
     const isAgentSwitch = currentAgentIdRef.current !== agentId;
-
-    logger.debug("[TERMINAL] useEffect triggered:", {
-      agentId: agentId.slice(0, 8),
-      isAgentSwitch,
-      outputVersion,
-      lastBufferLength: lastBufferLengthRef.current,
-      bufferLength: outputBuffer.length,
-    });
 
     // Handle agent switch - clear terminal, write entire buffer of new agent
     if (isAgentSwitch) {
       terminal.clear();
       currentAgentIdRef.current = agentId;
 
-      // Write the ENTIRE buffer for the new agent (using prop directly, not ref)
+      // Write the ENTIRE buffer for the new agent
       if (outputBuffer.length > 0) {
         const allData = outputBuffer.join("");
-        logger.debug(
-          "[TERMINAL] agent switch, writing full buffer:",
-          agentId.slice(0, 8),
-          "items:",
-          outputBuffer.length,
-          "dataLen:",
-          allData.length
-        );
         if (allData && !isDisposedRef.current) {
           try {
             terminal.write(allData);
@@ -325,23 +300,24 @@ export const TerminalView = ({
             // Terminal may have been disposed
           }
         }
-      } else {
-        logger.debug("[TERMINAL] agent switch, buffer empty:", agentId.slice(0, 8));
       }
 
       // Set to current buffer length so we only write NEW data after this
       lastBufferLengthRef.current = outputBuffer.length;
 
-      // Fit terminal after agent switch - single debounced fit
+      // Fit terminal after agent switch
       if (fitTimeoutRef.current) {
         clearTimeout(fitTimeoutRef.current);
       }
 
       fitTimeoutRef.current = setTimeout(() => {
-        if (!isDisposedRef.current && fitAddonRef.current && xtermRef.current) {
+        if (!isDisposedRef.current && fitAddonRef.current && terminalInstanceRef.current) {
           try {
             fitAddonRef.current.fit();
-            onResizeRef.current(xtermRef.current!.cols, xtermRef.current!.rows);
+            onResizeRef.current(
+              terminalInstanceRef.current!.cols,
+              terminalInstanceRef.current!.rows
+            );
           } catch {
             // Ignore fit errors
           }
@@ -358,27 +334,16 @@ export const TerminalView = ({
     }
 
     // Write only truly new data (buffer grew since last render)
-    // Use outputBuffer prop directly - it's always the correct agent's buffer
     if (outputBuffer.length > lastBufferLengthRef.current) {
-      const newItems = outputBuffer.slice(lastBufferLengthRef.current);
-      const combinedData = newItems.join("");
-
-      logger.debug(
-        "[TERMINAL] write:",
-        agentId.slice(0, 8),
-        "from index:",
-        lastBufferLengthRef.current,
-        "to:",
-        outputBuffer.length,
-        "dataLen:",
-        combinedData.length
-      );
-
-      if (combinedData && !isDisposedRef.current) {
-        try {
-          terminal.write(combinedData);
-        } catch {
-          // Terminal may have been disposed
+      for (let i = lastBufferLengthRef.current; i < outputBuffer.length; i++) {
+        const chunk = outputBuffer[i];
+        if (chunk && !isDisposedRef.current) {
+          try {
+            terminal.write(chunk);
+          } catch {
+            // Terminal may have been disposed
+            break;
+          }
         }
       }
       lastBufferLengthRef.current = outputBuffer.length;
@@ -390,45 +355,37 @@ export const TerminalView = ({
         safeFit();
       });
     }
-  }, [agentId, outputVersion, containerReady, safeFit]);
+  }, [agentId, outputVersion, terminalReady, safeFit]);
 
   // Update terminal settings
   useEffect(() => {
-    if (xtermRef.current && !isDisposedRef.current) {
-      xtermRef.current.options.fontSize = fontSize;
-      xtermRef.current.options.fontFamily = fontFamily;
-      xtermRef.current.options.cursorStyle = cursorStyle;
-      xtermRef.current.options.cursorBlink = cursorBlink;
+    if (terminalInstanceRef.current && !isDisposedRef.current) {
+      // Note: ghostty-web may not support dynamic option updates
+      // The terminal may need to be recreated for font changes
       safeFit();
     }
   }, [fontSize, fontFamily, cursorStyle, cursorBlink, safeFit]);
 
   // Update terminal theme when effective theme changes
   useEffect(() => {
-    if (xtermRef.current && !isDisposedRef.current) {
-      xtermRef.current.options.theme = getTerminalTheme(effectiveTheme === "dark");
+    if (terminalInstanceRef.current && !isDisposedRef.current) {
+      // Note: ghostty-web may not support dynamic theme updates
+      // This may require terminal recreation
     }
   }, [effectiveTheme]);
 
   // Refit terminal when container ref changes
   const containerRef = useCallback((node: HTMLDivElement | null) => {
-    console.log("[TerminalView] containerRef called, node:", !!node);
     if (node) {
       terminalRef.current = node;
-      console.log("[TerminalView] container dimensions:", node.offsetWidth, "x", node.offsetHeight);
       // Check if container has actual dimensions
       if (node.offsetWidth > 0 && node.offsetHeight > 0) {
-        console.log("[TerminalView] setting containerReady to true");
         setContainerReady(true);
       } else {
         // Retry after layout
-        console.log("[TerminalView] no dimensions, retrying with requestAnimationFrame");
         requestAnimationFrame(() => {
           if (terminalRef.current?.offsetWidth && terminalRef.current?.offsetHeight) {
-            console.log("[TerminalView] retry successful, setting containerReady to true");
             setContainerReady(true);
-          } else {
-            console.log("[TerminalView] retry failed, dimensions still 0");
           }
         });
       }
@@ -437,8 +394,8 @@ export const TerminalView = ({
 
   // Handle click on container to focus terminal
   const handleContainerClick = useCallback(() => {
-    if (xtermRef.current && !isDisposedRef.current) {
-      xtermRef.current.focus();
+    if (terminalInstanceRef.current && !isDisposedRef.current) {
+      terminalInstanceRef.current.focus();
       // Also refit on click in case container was resized
       requestAnimationFrame(() => {
         safeFit();
@@ -466,9 +423,10 @@ export const TerminalView = ({
 
   return (
     <div
-      className={cn("h-full w-full", className)}
+      className={cn("terminal-container h-full w-full", className)}
       onClick={handleContainerClick}
       onContextMenu={handleContextMenu}
+      tabIndex={0}
     >
       <div ref={containerRef} className="h-full w-full" />
     </div>

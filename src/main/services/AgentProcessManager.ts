@@ -79,7 +79,9 @@ class AgentProcessManager extends EventEmitter {
 
   // Todo parsing buffer (accumulates recent output for parsing)
   private todoParseBuffers: Map<string, string> = new Map();
+  private todoParseTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private readonly TODO_PARSE_BUFFER_SIZE = 50000; // Keep last 50KB for todo parsing
+  private readonly TODO_PARSE_DEBOUNCE_MS = 300; // Debounce todo parsing to reduce CPU load
 
   // Output batching to prevent IPC flooding
   private pendingOutputs: Map<string, { data: string; timestamp: number }[]> = new Map();
@@ -233,7 +235,6 @@ class AgentProcessManager extends EventEmitter {
   }
 
   private handleAgentOutput(agentId: string, data: string): void {
-    console.log("[MAIN] handleAgentOutput:", agentId.slice(0, 8), data.length, "bytes");
     const agent = this.agents.get(agentId);
     if (!agent) return;
 
@@ -256,6 +257,7 @@ class AgentProcessManager extends EventEmitter {
 
   /**
    * Accumulate output for todo parsing with a rolling buffer
+   * Uses debouncing to prevent excessive parsing on rapid output
    */
   private accumulateForTodoParsing(agentId: string, data: string): void {
     let currentBuffer = this.todoParseBuffers.get(agentId) || "";
@@ -268,8 +270,19 @@ class AgentProcessManager extends EventEmitter {
 
     this.todoParseBuffers.set(agentId, currentBuffer);
 
-    // Parse for todos
-    this.parseAndEmitTodos(agentId, currentBuffer);
+    // Debounce todo parsing - only parse after output settles
+    const existingTimeout = this.todoParseTimeouts.get(agentId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    this.todoParseTimeouts.set(
+      agentId,
+      setTimeout(() => {
+        this.todoParseTimeouts.delete(agentId);
+        this.parseAndEmitTodos(agentId, currentBuffer);
+      }, this.TODO_PARSE_DEBOUNCE_MS)
+    );
   }
 
   /**
@@ -327,12 +340,6 @@ class AgentProcessManager extends EventEmitter {
     const combinedData = batch.map((b) => b.data).join("");
     const latestTimestamp = batch[batch.length - 1].timestamp;
 
-    console.log(
-      "[MAIN] flushOutputBatch sending to renderer:",
-      agentId.slice(0, 8),
-      combinedData.length,
-      "bytes"
-    );
     // Send to renderer
     this.sendToRenderer("agent:output", {
       agentId,
@@ -385,6 +392,12 @@ class AgentProcessManager extends EventEmitter {
     if (flushTimeout) {
       clearTimeout(flushTimeout);
       this.flushTimeouts.delete(agentId);
+    }
+
+    const todoParseTimeout = this.todoParseTimeouts.get(agentId);
+    if (todoParseTimeout) {
+      clearTimeout(todoParseTimeout);
+      this.todoParseTimeouts.delete(agentId);
     }
 
     // Flush pending outputs before clearing to prevent data loss
@@ -489,6 +502,12 @@ class AgentProcessManager extends EventEmitter {
       clearTimeout(timeout);
     }
     this.flushTimeouts.clear();
+
+    // Clear all todo parse timeouts
+    for (const timeout of this.todoParseTimeouts.values()) {
+      clearTimeout(timeout);
+    }
+    this.todoParseTimeouts.clear();
 
     // Clear pending outputs
     this.pendingOutputs.clear();

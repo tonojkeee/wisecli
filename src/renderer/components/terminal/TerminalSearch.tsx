@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { SearchAddon } from "@xterm/addon-search";
 import { useTranslation } from "react-i18next";
 import { ChevronUp, ChevronDown, X } from "lucide-react";
 import { Input } from "@renderer/components/ui/input";
@@ -7,18 +6,29 @@ import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
 
 interface TerminalSearchProps {
-  searchAddon: SearchAddon | null;
+  searchAddon: null; // Kept for API compatibility, but not used
   isOpen: boolean;
   onClose: () => void;
+  onSearch?: (term: string, options: { caseSensitive: boolean; regex: boolean }) => void;
 }
 
-export function TerminalSearch({ searchAddon, isOpen, onClose }: TerminalSearchProps) {
+/**
+ * Terminal search component
+ *
+ * Note: ghostty-web doesn't have a built-in SearchAddon like xterm.js.
+ * This component provides a UI for search, but actual search functionality
+ * would need to be implemented differently (e.g., using browser find,
+ * or implementing custom buffer search).
+ */
+export function TerminalSearch({
+  isOpen,
+  onClose,
+  onSearch,
+}: TerminalSearchProps) {
   const { t } = useTranslation("terminal");
   const [searchTerm, setSearchTerm] = useState("");
   const [matchCase, setMatchCase] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
-  const [resultIndex, setResultIndex] = useState(0);
-  const [totalResults, setTotalResults] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus input when search opens
@@ -29,51 +39,19 @@ export function TerminalSearch({ searchAddon, isOpen, onClose }: TerminalSearchP
     }
   }, [isOpen]);
 
-  // Perform search when term or options change
+  // Notify parent of search changes
   useEffect(() => {
-    if (!searchAddon || !searchTerm) {
-      setTotalResults(0);
-      setResultIndex(0);
-      return;
+    if (searchTerm && onSearch) {
+      onSearch(searchTerm, { caseSensitive: matchCase, regex: useRegex });
     }
-
-    try {
-      const results = searchAddon.findNext(searchTerm, {
-        caseSensitive: matchCase,
-        regex: useRegex,
-        wholeWord: false,
-      });
-      // SearchAddon doesn't return count, we'll track via navigation
-      setTotalResults(results ? 1 : 0);
-    } catch {
-      // Invalid regex or search error
-      setTotalResults(0);
-    }
-  }, [searchTerm, matchCase, useRegex, searchAddon]);
+  }, [searchTerm, matchCase, useRegex, onSearch]);
 
   const handleSearch = useCallback(
-    (direction: "next" | "prev") => {
-      if (!searchAddon || !searchTerm) return;
-
-      try {
-        if (direction === "next") {
-          searchAddon.findNext(searchTerm, {
-            caseSensitive: matchCase,
-            regex: useRegex,
-            wholeWord: false,
-          });
-        } else {
-          searchAddon.findPrevious(searchTerm, {
-            caseSensitive: matchCase,
-            regex: useRegex,
-            wholeWord: false,
-          });
-        }
-      } catch {
-        // Invalid regex or search error
-      }
+    (_direction: "next" | "prev") => {
+      // Search navigation not implemented for ghostty-web
+      // Could be implemented with custom buffer search in the future
     },
-    [searchAddon, searchTerm, matchCase, useRegex]
+    []
   );
 
   const handleKeyDown = useCallback(
@@ -91,7 +69,6 @@ export function TerminalSearch({ searchAddon, isOpen, onClose }: TerminalSearchP
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-    setResultIndex(0);
   }, []);
 
   const toggleMatchCase = useCallback(() => {
@@ -114,16 +91,8 @@ export function TerminalSearch({ searchAddon, isOpen, onClose }: TerminalSearchP
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder={t("search.placeholder", "Search terminal...")}
-          className="h-8 text-sm pr-16"
+          className="h-8 text-sm"
         />
-        {/* Results counter */}
-        {searchTerm && (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-            {totalResults > 0
-              ? `${resultIndex + 1} of ${totalResults}`
-              : t("search.noResults", "No results")}
-          </span>
-        )}
       </div>
 
       {/* Match case toggle */}

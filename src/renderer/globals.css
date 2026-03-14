@@ -86,31 +86,51 @@
   transition-duration: 0.01ms !important;
 }
 
-/* xterm.js customization */
-.xterm {
-  padding: 8px;
+/* ghostty-web terminal customization */
+.ghostty-terminal {
+  padding: 0;
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Fix black border around terminal - make viewport background transparent */
-.xterm-viewport {
+/* Terminal container wrapper - provides padding and visual styling */
+.terminal-container {
+  padding: 12px;
+  border-radius: 8px;
+  background: hsl(var(--background));
+  overflow: hidden;
+}
+
+/* Canvas element styling */
+.ghostty-terminal canvas {
+  border-radius: 0;
+}
+
+/* Viewport/scrollback styling */
+.ghostty-viewport {
   background-color: transparent !important;
+  border-radius: 0;
 }
 
-.xterm-viewport::-webkit-scrollbar {
+/* Scrollbar styling */
+.ghostty-viewport::-webkit-scrollbar {
   width: 8px;
 }
 
-.xterm-viewport::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
+.ghostty-viewport::-webkit-scrollbar-track {
+  background: transparent;
   border-radius: 4px;
 }
 
-.xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+.ghostty-viewport::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 4px;
+}
+
+.ghostty-viewport::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
 }
 
 /* Custom animations for sidebar */

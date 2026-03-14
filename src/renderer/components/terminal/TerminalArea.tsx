@@ -35,10 +35,6 @@ export function TerminalArea({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { sendMessage, cancelStream } = useChatActions();
 
-  // Debug logging
-  console.log("[TerminalArea] render - activeAgent:", activeAgent?.id || null);
-  console.log("[TerminalArea] render - activeChatAgent:", activeChatAgent?.id || null);
-
   const cursorStyle = terminalSettings?.cursorStyle ?? "block";
   const cursorBlink = terminalSettings?.cursorBlink ?? true;
   const copyOnSelect = terminalSettings?.copyOnSelect ?? false;
@@ -54,7 +50,6 @@ export function TerminalArea({
 
   // Render chat view for chat agents
   if (activeChatAgent) {
-    console.log("[TerminalArea] rendering CHAT view");
     return (
       <div className="flex flex-col h-full overflow-hidden">
         <ChatView
@@ -69,13 +64,11 @@ export function TerminalArea({
 
   // Render terminal view for terminal agents
   if (activeAgent) {
-    console.log("[TerminalArea] rendering TERMINAL view for agent:", activeAgent.id);
-    console.log("[TerminalArea] outputBuffer length:", activeAgent.outputBuffer?.length);
     return (
       <div className="flex flex-col h-full overflow-hidden">
         {/* Search bar */}
         <TerminalSearch
-          searchAddon={terminalRef.current?.getSearchAddon() ?? null}
+          searchAddon={null}
           isOpen={isSearchOpen}
           onClose={handleCloseSearch}
         />
@@ -111,7 +104,6 @@ export function TerminalArea({
     );
   }
 
-  console.log("[TerminalArea] rendering EMPTY state (no agent)");
   return (
     <div className="flex h-full items-center justify-center text-muted-foreground">
       <div className="text-center">
