@@ -90,6 +90,9 @@ class AgentProcessManager extends EventEmitter {
   private readonly OUTPUT_BATCH_MS = 16; // ~60fps, imperceptible delay
   private readonly MAX_BATCH_SIZE = 100; // Increased from 50
 
+  // Track agents being killed to prevent race conditions
+  private agentKillState: Map<string, boolean> = new Map();
+
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
   }
@@ -378,8 +381,20 @@ class AgentProcessManager extends EventEmitter {
   }
 
   killAgent(agentId: string): void {
+    // Prevent race condition: check if already being killed
+    if (this.agentKillState.get(agentId)) {
+      debug.log("[AgentProcessManager] Agent already being killed:", agentId);
+      return;
+    }
+
     const agent = this.agents.get(agentId);
-    if (!agent) return;
+    if (!agent) {
+      this.agentKillState.delete(agentId);
+      return;
+    }
+
+    // Mark as being killed to prevent double-kill
+    this.agentKillState.set(agentId, true);
 
     // Clear all timeouts for this agent
     const statusTimeout = this.statusTimeouts.get(agentId);
@@ -424,6 +439,7 @@ class AgentProcessManager extends EventEmitter {
     this.agents.delete(agentId);
     this.outputBuffers.delete(agentId);
     this.todoParseBuffers.delete(agentId);
+    this.agentKillState.delete(agentId);
     this.emit("agent:killed", { agentId });
   }
 

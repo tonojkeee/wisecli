@@ -598,42 +598,7 @@ const electronAPI = {
   },
 };
 
-// Type declaration for renderer
-export interface DirectoryEntry {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  isFile: boolean;
-  extension?: string;
-  size?: number;
-  modifiedAt?: Date;
-}
-
 // Expose to renderer via contextBridge
 contextBridge.exposeInMainWorld("electronAPI", electronAPI);
-
-// Type declaration for renderer
-export interface DirectoryEntry {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  isFile: boolean;
-  extension?: string;
-  size?: number;
-  modifiedAt?: Date;
-}
-
-export interface FileContent {
-  content: string;
-  encoding: string;
-  size: number;
-  modifiedAt: Date;
-}
-
-export interface FsResult<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
 
 export type ElectronAPI = typeof electronAPI;

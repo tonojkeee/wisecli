@@ -1305,11 +1305,42 @@ class McpClientService {
     // Reject all pending requests
     this.rejectAllPendingRequests("Service shutting down");
 
-    // Kill vision process
+    // Kill vision process with proper cleanup
     if (this.visionProcess) {
-      this.visionProcess.kill();
-      this.visionProcess = null;
-      this.visionProcessReady = false;
+      try {
+        this.visionProcess.kill();
+        // Wait for process to exit (with timeout)
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            // Force kill if graceful shutdown takes too long
+            if (this.visionProcess) {
+              try {
+                this.visionProcess.kill("SIGKILL");
+              } catch {
+                // Process may already be dead
+              }
+            }
+            resolve();
+          }, 2000);
+
+          this.visionProcess.on("exit", () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+
+          // If process is already dead, resolve immediately
+          if (!this.visionProcess || !this.visionProcess.pid) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      } catch (error) {
+        debug.error("[McpClientService] Error killing vision process:", error);
+      } finally {
+        this.visionProcess = null;
+        this.visionProcessReady = false;
+        this.visionBuffer = "";
+      }
     }
 
     this.apiKey = "";

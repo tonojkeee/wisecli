@@ -120,7 +120,14 @@ export function registerSessionHandlers(): void {
   });
 
   ipcMain.handle("claude-settings:get-api-key", async () => {
-    return claudeSettings.getApiKey();
+    // SECURITY: Return masked API key to prevent exposure to renderer
+    const apiKey = claudeSettings.getApiKey();
+    if (!apiKey) return null;
+    // Mask: show first 7 chars and last 3 chars (e.g., "sk-ant-***...***xyz")
+    if (apiKey.length > 12) {
+      return `${apiKey.slice(0, 7)}***...***${apiKey.slice(-3)}`;
+    }
+    return "***masked***";
   });
 
   ipcMain.handle("claude-settings:has-api-key", async () => {

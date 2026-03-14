@@ -149,6 +149,8 @@ class ClaudeCodeServer {
       authToken: this.authToken,
     };
     await fs.promises.writeFile(this.lockFilePath, JSON.stringify(lockData));
+    // SECURITY: Restrict lock file permissions to owner only (prevent token theft)
+    await fs.promises.chmod(this.lockFilePath, 0o600);
 
     // Setup cleanup on exit
     process.once("exit", () => this.cleanupSync());

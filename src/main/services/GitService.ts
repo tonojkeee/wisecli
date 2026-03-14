@@ -328,7 +328,20 @@ class GitService {
 
       watcher.on("error", (error) => {
         debug.debug("[GitService] Watcher error:", error);
-        this.stopWatching(repoPath);
+        // Clean up watcher and debounce timer on error
+        this.watchers.delete(repoPath);
+        const timer = this.debounceTimers.get(repoPath);
+        if (timer) {
+          clearTimeout(timer);
+          this.debounceTimers.delete(repoPath);
+        }
+        // Notify renderer about watcher error
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          this.mainWindow.webContents.send("git:watcher-error", {
+            repoPath,
+            error: error.message,
+          });
+        }
       });
     } catch (error) {
       debug.debug("[GitService] Failed to start watching:", error);
