@@ -12,7 +12,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "postinstall": "electron-builder install-app-deps",
-    "prepare": "husky",
+    "prepare": "node -e \"try{require('husky').install()}catch(e){}\"",
     "lint-staged": "lint-staged",
     "build:win": "pnpm build && electron-builder --win --x64",
     "build:linux": "pnpm build && electron-builder --linux --x64",
