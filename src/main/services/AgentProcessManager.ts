@@ -1,4 +1,5 @@
 import { BrowserWindow } from "electron";
+import { execFile } from "node:child_process";
 import { createRequire } from "node:module";
 import { EventEmitter } from "events";
 import { v4 as uuidv4 } from "uuid";
@@ -51,6 +52,48 @@ function sanitizeEnv(env: Record<string, string> | undefined): Record<string, st
     sanitized[key] = value;
   }
   return sanitized;
+}
+
+let resolvedLoginShellPath: Promise<string | null> | null = null;
+
+function resolveLoginShellPath(): Promise<string | null> {
+  if (resolvedLoginShellPath) {
+    return resolvedLoginShellPath;
+  }
+
+  if (isWindows) {
+    resolvedLoginShellPath = new Promise((resolve) => {
+      const shell = process.env.ComSpec || "cmd.exe";
+      execFile(shell, ["/d", "/s", "/c", "echo %PATH%"], { timeout: 3000 }, (error, stdout) => {
+        if (error) {
+          debug.warn("[AgentProcessManager] Failed to resolve Windows shell PATH:", error.message);
+          resolve(null);
+          return;
+        }
+
+        const shellPath = stdout.trim();
+        resolve(shellPath || null);
+      });
+    });
+
+    return resolvedLoginShellPath;
+  }
+
+  resolvedLoginShellPath = new Promise((resolve) => {
+    const shell = process.env.SHELL || "/bin/sh";
+    execFile(shell, ["-lic", 'printf "%s" "$PATH"'], { timeout: 3000 }, (error, stdout) => {
+      if (error) {
+        debug.warn("[AgentProcessManager] Failed to resolve login shell PATH:", error.message);
+        resolve(null);
+        return;
+      }
+
+      const loginShellPath = stdout.trim();
+      resolve(loginShellPath || null);
+    });
+  });
+
+  return resolvedLoginShellPath;
 }
 
 export interface Agent {
@@ -143,6 +186,8 @@ class AgentProcessManager extends EventEmitter {
       debug.debug("[AgentProcessManager] Failed to get git context:", error);
     }
 
+    const loginShellPath = await resolveLoginShellPath();
+
     // Build environment with IDE integration
     const ideEnv: Record<string, string> = {
       // Mark this as a WiseCLI terminal for hooks
@@ -173,6 +218,7 @@ class AgentProcessManager extends EventEmitter {
       cwd: workingDirectory,
       env: {
         ...process.env,
+        ...(loginShellPath ? { PATH: loginShellPath } : {}),
         TERM: "xterm-256color",
         // Add git context if available
         ...(gitContext ? { GIT_CHANGED_FILES_CONTEXT: gitContext } : {}),

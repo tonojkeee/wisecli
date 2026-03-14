@@ -12,6 +12,14 @@ import { claudeSettings } from "./ClaudeSettings.js";
 import { debug } from "../utils/debug.js";
 
 const isWindows = process.platform === "win32";
+const LEGACY_HOOK_TYPES = new Set([
+  "PreToolUse",
+  "PostToolUse",
+  "Stop",
+  "UserPromptSubmit",
+  "Notification",
+  "SessionStart",
+]);
 
 /**
  * Unix bash script for statusline hook
@@ -62,6 +70,43 @@ const STATUSLINE_SCRIPT_CMD = `@echo off\r\nif "%WISECLI_TERMINAL%"=="" exit /b 
  */
 class HookScriptsManager {
   private hooksDir: string | null = null;
+
+  /**
+   * Detect old WiseCLI-related hook commands and remove them from Claude settings.
+   * Keeps unrelated user hooks intact.
+   */
+  private isLegacyWiseCliHookCommand(hookType: string, command: string): boolean {
+    if (!LEGACY_HOOK_TYPES.has(hookType)) {
+      return false;
+    }
+
+    const normalized = command.replace(/\\/g, "/").toLowerCase();
+
+    const hasWiseCliMarker =
+      normalized.includes("wisecli") ||
+      normalized.includes("statusline") ||
+      normalized.includes("wisecli.sock") ||
+      normalized.includes("wisecli.port") ||
+      normalized.includes("localhost/statusline") ||
+      normalized.includes("127.0.0.1") ||
+      normalized.includes("/statusline");
+
+    const hasLegacyUvMarker = normalized.includes("uv ") || normalized.includes("uvx") || normalized.includes("/uv");
+
+    return hasWiseCliMarker || hasLegacyUvMarker;
+  }
+
+  /**
+   * Legacy startup hooks were often configured as SessionStart/startup.
+   * Keep removal narrow so unrelated user hooks are preserved.
+   */
+  private isLegacyWiseCliHookMatcher(hookType: string, matcher: string): boolean {
+    if (hookType !== "SessionStart") {
+      return false;
+    }
+
+    return matcher.trim().toLowerCase() === "startup";
+  }
 
   /**
    * Get the hooks directory path
@@ -123,11 +168,38 @@ class HookScriptsManager {
    */
   private migrateToStatusLine(): void {
     const scriptPath = this.getStatuslineScriptPath();
+    let migrated = false;
 
     // Remove old hooks if they exist
     if (claudeSettings.hasHookScript(scriptPath)) {
       debug.log("[HookScriptsManager] Migrating from old hooks to statusLine format");
-      claudeSettings.removeHook(scriptPath);
+      migrated = claudeSettings.removeHook(scriptPath) || migrated;
+    }
+
+    const removedLegacyHooks = claudeSettings.removeHooksByMatcher((hookType, matcher, hook) => {
+      if (hook.type !== "command") {
+        return false;
+      }
+
+      const matchesLegacyCommand = this.isLegacyWiseCliHookCommand(hookType, hook.command);
+      if (!matchesLegacyCommand) {
+        return false;
+      }
+
+      if (hookType === "SessionStart") {
+        return this.isLegacyWiseCliHookMatcher(hookType, matcher.matcher);
+      }
+
+      return true;
+    });
+
+    if (removedLegacyHooks) {
+      migrated = true;
+      debug.log("[HookScriptsManager] Removed legacy WiseCLI Claude hooks from settings");
+    }
+
+    if (!migrated) {
+      debug.log("[HookScriptsManager] No legacy WiseCLI hooks found for migration");
     }
   }
 

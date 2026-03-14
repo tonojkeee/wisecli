@@ -7,6 +7,7 @@ import type {
   ClaudeSettings,
   ClaudeEnvSettings,
   ClaudeHook,
+  ClaudeHookMatcher,
   StatusLineSettings,
 } from "@shared/types";
 
@@ -257,6 +258,55 @@ class ClaudeSettingsManager {
       return this.save(settings);
     }
     return true;
+  }
+
+  /**
+   * Remove hook commands that match a predicate.
+   * Used for safe migration away from legacy WiseCLI integrations.
+   */
+  removeHooksByMatcher(
+    predicate: (hookType: string, matcher: ClaudeHookMatcher, hook: ClaudeHook) => boolean
+  ): boolean {
+    const settings = this.get();
+    const hooks = settings.hooks;
+    if (!hooks) return true;
+
+    let modified = false;
+    const nextHooks: Record<string, ClaudeHookMatcher[]> = {};
+
+    for (const [hookType, hookMatchers] of Object.entries(hooks)) {
+      const nextMatchers: ClaudeHookMatcher[] = [];
+
+      for (const hookMatcher of hookMatchers) {
+        const filteredHooks = hookMatcher.hooks.filter((hook) => {
+          const shouldRemove = predicate(hookType, hookMatcher, hook);
+          if (shouldRemove) modified = true;
+          return !shouldRemove;
+        });
+
+        if (filteredHooks.length > 0) {
+          nextMatchers.push({
+            ...hookMatcher,
+            hooks: filteredHooks,
+          });
+        } else if (hookMatcher.hooks.length > 0) {
+          modified = true;
+        }
+      }
+
+      if (nextMatchers.length > 0) {
+        nextHooks[hookType] = nextMatchers;
+      } else if (hookMatchers.length > 0) {
+        modified = true;
+      }
+    }
+
+    if (!modified) {
+      return true;
+    }
+
+    settings.hooks = Object.keys(nextHooks).length > 0 ? nextHooks : undefined;
+    return this.save(settings);
   }
 
   /**

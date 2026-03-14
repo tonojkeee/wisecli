@@ -9,6 +9,7 @@ import { getTerminalTheme } from "@renderer/lib/terminal-theme";
 import { useEffectiveTheme } from "@renderer/stores/useSettingsStore";
 
 const TERMINAL_DEBUG = import.meta.env.DEV;
+const isMac = /mac|iphone|ipad|ipod/i.test(navigator.platform);
 
 interface TerminalViewProps {
   agentId: string;
@@ -97,6 +98,27 @@ export const TerminalView = ({
   const onResizeRef = useRef(onResize);
   const copyOnSelectRef = useRef(copyOnSelect);
   const onSearchOpenRef = useRef(onSearchOpen);
+
+  const copySelectionToClipboard = useCallback(() => {
+    const terminal = terminalInstanceRef.current;
+    if (!terminal || isDisposedRef.current) return false;
+
+    const selection = terminal.getSelection();
+    if (!selection) return false;
+
+    void window.electronAPI.clipboard.writeText(selection);
+    return true;
+  }, []);
+
+  const pasteClipboardToTerminal = useCallback(() => {
+    if (isDisposedRef.current || !onInputRef.current) return;
+
+    void window.electronAPI.clipboard.readText().then((text) => {
+      if (text && !isDisposedRef.current && onInputRef.current) {
+        onInputRef.current(text);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     onInputRef.current = onInput;
@@ -333,13 +355,48 @@ export const TerminalView = ({
     disposables.push(
       terminal.onSelectionChange(() => {
         if (!isDisposedRef.current && copyOnSelectRef.current) {
-          const selection = terminal.getSelection();
-          if (selection) {
-            window.electronAPI.clipboard.writeText(selection);
-          }
+          copySelectionToClipboard();
         }
       })
     );
+
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (isDisposedRef.current) return true;
+
+      const key = event.key.toUpperCase();
+      const isCopyShortcut =
+        (isMac && event.metaKey && !event.ctrlKey && !event.altKey && key === "C") ||
+        (!isMac && event.ctrlKey && event.shiftKey && key === "C");
+      const isPasteShortcut =
+        (isMac && event.metaKey && !event.ctrlKey && !event.altKey && key === "V") ||
+        (!isMac && event.ctrlKey && event.shiftKey && key === "V");
+      const isSearchShortcut = (event.ctrlKey || event.metaKey) && key === "F";
+
+      if (isCopyShortcut) {
+        const copied = copySelectionToClipboard();
+        if (copied) {
+          event.preventDefault();
+          return false;
+        }
+
+        // If nothing is selected, let the event through so Ctrl+C/Cmd+C can behave naturally.
+        return true;
+      }
+
+      if (isPasteShortcut) {
+        event.preventDefault();
+        pasteClipboardToTerminal();
+        return false;
+      }
+
+      if (isSearchShortcut) {
+        event.preventDefault();
+        onSearchOpenRef.current?.();
+        return false;
+      }
+
+      return true;
+    });
 
     return () => {
       // Mark as disposed first to prevent any pending callbacks
@@ -402,52 +459,6 @@ export const TerminalView = ({
       resizeObserver.disconnect();
     };
   }, [terminalReady, safeFit]);
-
-  // Handle keyboard shortcuts via container events
-  useEffect(() => {
-    const container = terminalRef.current;
-    if (!container || !terminalReady) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isDisposedRef.current || !terminalInstanceRef.current) return;
-
-      const terminal = terminalInstanceRef.current;
-
-      // Ctrl+Shift+C = Copy selection to clipboard
-      if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === "C") {
-        const selection = terminal.getSelection();
-        if (selection) {
-          event.preventDefault();
-          window.electronAPI.clipboard.writeText(selection);
-        }
-        return;
-      }
-
-      // Ctrl+Shift+V = Paste from clipboard
-      if (event.ctrlKey && event.shiftKey && event.key.toUpperCase() === "V") {
-        event.preventDefault();
-        window.electronAPI.clipboard.readText().then((text) => {
-          if (text && !isDisposedRef.current && onInputRef.current) {
-            onInputRef.current(text);
-          }
-        });
-        return;
-      }
-
-      // Ctrl+F / Cmd+F = Open search
-      if ((event.ctrlKey || event.metaKey) && event.key.toUpperCase() === "F") {
-        event.preventDefault();
-        onSearchOpenRef.current?.();
-        return;
-      }
-    };
-
-    container.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      container.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [terminalReady]);
 
   // Restore terminal content from snapshot on agent switch / remount / recovery.
   useEffect(() => {
