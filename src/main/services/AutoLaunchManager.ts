@@ -36,14 +36,19 @@ function execCommand(command: string, args: string[]): Promise<{ stdout: string;
 }
 
 /**
- * Execute a PowerShell command safely
+ * Execute a PowerShell command safely using EncodedCommand
+ * This eliminates all injection vectors by passing the command as Base64 UTF-16LE
  */
-function execPowerShell(psCommand: string): Promise<{ stdout: string; stderr: string }> {
+function execPowerShellEncoded(psCommand: string): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    // Use -EncodedCommand for safer execution, or -Command with proper escaping
-    const proc = spawn("powershell", ["-NoProfile", "-NonInteractive", "-Command", psCommand], {
-      shell: false,
-    });
+    // Encode command as Base64 UTF-16LE (PowerShell -EncodedCommand format)
+    const encodedCommand = Buffer.from(psCommand, "utf16le").toString("base64");
+    const proc = spawn("powershell", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-EncodedCommand",
+      encodedCommand,
+    ], { shell: false });
     let stdout = "";
     let stderr = "";
 
@@ -74,7 +79,12 @@ class AutoLaunchManager {
   private appPath: string;
 
   constructor() {
-    this.appName = app.getName();
+    const appName = app.getName();
+    // Security: Validate app name contains only safe characters to prevent injection
+    if (!/^[a-zA-Z0-9_.-]+$/.test(appName)) {
+      throw new Error(`Unsafe app name for auto-launch: ${appName}`);
+    }
+    this.appName = appName;
     this.appPath = app.getPath("exe");
   }
 
@@ -202,12 +212,12 @@ class AutoLaunchManager {
       ]);
       return true;
     } catch {
-      // Fallback: try using PowerShell
+      // Fallback: try using PowerShell with EncodedCommand for safety
       try {
-        // Escape the path for PowerShell
-        const escapedPath = this.appPath.replace(/'/g, "''");
+        // Escape the path for PowerShell (double-escape backslashes for registry)
+        const escapedPath = this.appPath.replace(/'/g, "''").replace(/\\/g, "\\\\");
         const psCommand = `New-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '${appName}' -Value '${escapedPath}' -PropertyType String -Force`;
-        await execPowerShell(psCommand);
+        await execPowerShellEncoded(psCommand);
         return true;
       } catch {
         return false;
@@ -232,7 +242,7 @@ class AutoLaunchManager {
       // Key might not exist, which is fine
       try {
         const psCommand = `Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name '${appName}' -ErrorAction SilentlyContinue`;
-        await execPowerShell(psCommand);
+        await execPowerShellEncoded(psCommand);
         return true;
       } catch {
         return false;

@@ -56,20 +56,47 @@ interface SidebarProps {
 }
 
 function arePropsEqual(prevProps: SidebarProps, nextProps: SidebarProps): boolean {
-  return (
-    prevProps.activeSection === nextProps.activeSection &&
-    prevProps.activeSessionId === nextProps.activeSessionId &&
-    prevProps.activeAgentId === nextProps.activeAgentId &&
-    prevProps.collapsed === nextProps.collapsed &&
-    prevProps.sessions.length === nextProps.sessions.length &&
-    prevProps.agents.length === nextProps.agents.length &&
-    prevProps.searchQuery === nextProps.searchQuery &&
-    prevProps.projectPath === nextProps.projectPath &&
-    prevProps.openFilesCount === nextProps.openFilesCount &&
-    prevProps.pendingTasksCount === nextProps.pendingTasksCount &&
-    prevProps.streamingChatsCount === nextProps.streamingChatsCount &&
-    prevProps.className === nextProps.className
-  );
+  // Fast path: check simple primitives first
+  if (
+    prevProps.activeSection !== nextProps.activeSection ||
+    prevProps.activeSessionId !== nextProps.activeSessionId ||
+    prevProps.activeAgentId !== nextProps.activeAgentId ||
+    prevProps.collapsed !== nextProps.collapsed ||
+    prevProps.searchQuery !== nextProps.searchQuery ||
+    prevProps.projectPath !== nextProps.projectPath ||
+    prevProps.openFilesCount !== nextProps.openFilesCount ||
+    prevProps.pendingTasksCount !== nextProps.pendingTasksCount ||
+    prevProps.streamingChatsCount !== nextProps.streamingChatsCount ||
+    prevProps.className !== nextProps.className
+  ) {
+    return false;
+  }
+
+  // Check sessions length
+  if (prevProps.sessions.length !== nextProps.sessions.length) {
+    return false;
+  }
+
+  // Check agents - must compare content, not just length
+  // because agent.status changes frequently (starting -> running -> idle)
+  if (prevProps.agents.length !== nextProps.agents.length) {
+    return false;
+  }
+
+  // Compare agent status and other mutable fields
+  for (let i = 0; i < prevProps.agents.length; i++) {
+    const prevAgent = prevProps.agents[i];
+    const nextAgent = nextProps.agents[i];
+    if (
+      prevAgent.id !== nextAgent.id ||
+      prevAgent.status !== nextAgent.status ||
+      prevAgent.lastActivity !== nextAgent.lastActivity
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 const SidebarComponent = function Sidebar({

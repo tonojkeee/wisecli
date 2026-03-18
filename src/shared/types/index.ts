@@ -9,4 +9,4 @@ export * from "./statusline";
 export * from "./claude-code";
 export * from "./claude-task";
 export * from "./chat";
-export * from "./opencode.js";
+export * from "./hooks";

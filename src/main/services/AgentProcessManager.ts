@@ -1,5 +1,7 @@
 import { BrowserWindow } from "electron";
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { createRequire } from "node:module";
 import { EventEmitter } from "events";
 import { v4 as uuidv4 } from "uuid";
@@ -108,6 +110,21 @@ function resolveClaudeCommandPath(): Promise<string | null> {
       execFile(shell, ["/d", "/s", "/c", "where claude.cmd"], { timeout: 3000 }, (error, stdout) => {
         if (error) {
           debug.warn("[AgentProcessManager] Failed to resolve Claude CLI on Windows:", error.message);
+
+          // Fallback: check common npm locations directly
+          const fallbackPaths = [
+            process.env.APPDATA ? path.join(process.env.APPDATA, "npm", "claude.cmd") : null,
+            process.env.NVM_SYMLINK ? path.join(process.env.NVM_SYMLINK, "claude.cmd") : null,
+          ].filter(Boolean) as string[];
+
+          for (const fallbackPath of fallbackPaths) {
+            if (existsSync(fallbackPath)) {
+              debug.log("[AgentProcessManager] Found Claude CLI at fallback path:", fallbackPath);
+              resolve(fallbackPath);
+              return;
+            }
+          }
+
           resolve(null);
           return;
         }
@@ -259,6 +276,24 @@ class AgentProcessManager extends EventEmitter {
       debug.log("[AgentProcessManager] Resuming Claude session:", resumeSessionId);
     }
 
+    // Enhance PATH on Windows to include npm global and NVM paths
+    let enhancedPath = loginShellPath || process.env.PATH || "";
+    if (isWindows) {
+      const pathSep = ";";
+      const additionalPaths: string[] = [];
+
+      const npmGlobal = process.env.APPDATA ? path.join(process.env.APPDATA, "npm") : null;
+      const nvmSymlink = process.env.NVM_SYMLINK;
+
+      if (npmGlobal && existsSync(npmGlobal)) additionalPaths.push(npmGlobal);
+      if (nvmSymlink && existsSync(nvmSymlink)) additionalPaths.push(nvmSymlink);
+
+      if (additionalPaths.length > 0) {
+        enhancedPath = enhancedPath + pathSep + additionalPaths.join(pathSep);
+        debug.log("[AgentProcessManager] Enhanced PATH with:", additionalPaths.join(pathSep));
+      }
+    }
+
     // Build PTY options with platform-specific settings
     const ptyOptions: Pty.IPtyForkOptions = {
       name: "xterm-256color",
@@ -267,7 +302,7 @@ class AgentProcessManager extends EventEmitter {
       cwd: workingDirectory,
       env: {
         ...process.env,
-        ...(loginShellPath ? { PATH: loginShellPath } : {}),
+        ...(enhancedPath ? { PATH: enhancedPath } : {}),
         TERM: "xterm-256color",
         // Add git context if available
         ...(gitContext ? { GIT_CHANGED_FILES_CONTEXT: gitContext } : {}),
@@ -280,7 +315,27 @@ class AgentProcessManager extends EventEmitter {
       ...(isWindows && { useConpty: true, encoding: "utf8" as BufferEncoding }),
     };
 
-    const ptyProcess = pty.spawn(claudeCommand, spawnArgs, ptyOptions);
+    // Spawn PTY process with platform-specific handling
+    let ptyProcess: Pty.IPty;
+    try {
+      if (isWindows) {
+        // On Windows, pass command through cmd.exe for proper .cmd file handling
+        const shell = process.env.ComSpec || "cmd.exe";
+        const cmdArgs = ["/d", "/s", "/c", claudeCommand, ...spawnArgs];
+        debug.log("[AgentProcessManager] Windows spawn:", shell, cmdArgs.join(" "));
+        ptyProcess = pty.spawn(shell, cmdArgs, ptyOptions);
+      } else {
+        ptyProcess = pty.spawn(claudeCommand, spawnArgs, ptyOptions);
+      }
+    } catch (spawnError) {
+      const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
+      debug.error("[AgentProcessManager] PTY spawn failed:", errorMsg);
+      this.sendToRenderer("agent:error", {
+        agentId,
+        error: `Failed to start Claude CLI: ${errorMsg}. Install with: npm install -g @anthropic-ai/claude-code`,
+      });
+      throw spawnError;
+    }
 
     const agent: Agent = {
       id: agentId,
@@ -322,7 +377,17 @@ class AgentProcessManager extends EventEmitter {
           "[AgentProcessManager] Sending status to renderer, mainWindow:",
           !!this.mainWindow
         );
+        debug.log("[AgentProcessManager] Sending agent:status event with agentId:", agentId);
         this.sendToRenderer("agent:status", { agentId, status: "running" });
+      } else {
+        debug.warn(
+          "[AgentProcessManager] NOT sending status - agent not found or not starting:",
+          agentId,
+          "found:",
+          !!currentAgent,
+          "status:",
+          currentAgent?.status
+        );
       }
       this.statusTimeouts.delete(agentId);
     }, 500);
@@ -449,6 +514,20 @@ class AgentProcessManager extends EventEmitter {
   private handleAgentExit(agentId: string, exitCode: number): void {
     const agent = this.agents.get(agentId);
     if (!agent) return;
+
+    // Early-exit detection: process exited within 3 seconds with error
+    const runtimeMs = Date.now() - agent.createdAt.getTime();
+    const isEarlyExit = runtimeMs < 3000 && exitCode !== 0;
+
+    if (isEarlyExit) {
+      debug.error("[AgentProcessManager] Early exit detected:", { agentId, exitCode, runtimeMs });
+      this.sendToRenderer("agent:error", {
+        agentId,
+        error: "Claude CLI exited unexpectedly. Verify installation: npm install -g @anthropic-ai/claude-code",
+        exitCode,
+        runtimeMs,
+      });
+    }
 
     agent.status = "exited";
     this.emit("agent:status", { agentId, status: "exited", exitCode });

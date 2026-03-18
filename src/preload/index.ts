@@ -56,6 +56,8 @@ import type {
   ToolStartEvent,
   ToolCompleteEvent,
   ToolErrorEvent,
+  // Hook types
+  HookStatus,
 } from "@shared/types";
 
 // Re-export types for renderer
@@ -106,6 +108,7 @@ export type {
   ToolStartEvent,
   ToolCompleteEvent,
   ToolErrorEvent,
+  HookStatus,
 };
 
 // Exposed API to renderer
@@ -595,6 +598,11 @@ const electronAPI = {
       ipcRenderer.on("tasks:updated", handler);
       return () => ipcRenderer.removeListener("tasks:updated", handler);
     },
+  },
+
+  // Hooks status
+  hooks: {
+    getStatus: (): Promise<HookStatus> => ipcRenderer.invoke("hooks:get-status"),
   },
 };
 

@@ -55,7 +55,7 @@ export interface DisplayStatusline {
   model: string;
   contextUsagePercent: number | null;
   contextRemainingPercent: number | null;
-  /** Total input tokens used */
+  /** Cumulative tokens used (input + output) for the session */
   contextUsedTokens: number | null;
   /** Max context window size in tokens */
   contextWindowSize: number | null;

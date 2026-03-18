@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { useMemo } from "react";
 import type { Todo, TodoStats } from "@shared/types/todo";
 
 interface TodoState {

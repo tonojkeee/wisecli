@@ -11,6 +11,7 @@ import { registerClaudeCodeIpcHandlers } from "./ipc/claudeCodeHandlers";
 import { registerClipboardHandlers } from "./ipc/clipboardHandlers";
 import { registerTaskHandlers } from "./ipc/taskHandlers";
 import { registerChatHandlers } from "./ipc/chatHandlers";
+import { registerHooksHandlers } from "./ipc/hooksHandlers";
 import { appSettingsManager } from "./services/AppSettingsManager";
 import { chatAgentManager } from "./services/ChatAgentManager";
 import { trayManager } from "./services/TrayManager";
@@ -47,6 +48,7 @@ registerClaudeCodeIpcHandlers();
 registerClipboardHandlers();
 registerTaskHandlers();
 registerChatHandlers();
+registerHooksHandlers();
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;

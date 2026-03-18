@@ -37,6 +37,7 @@ export function TerminalArea({
 
   const cursorStyle = terminalSettings?.cursorStyle ?? "block";
   const cursorBlink = terminalSettings?.cursorBlink ?? true;
+  const scrollback = terminalSettings?.scrollback ?? 10000;
   const copyOnSelect = terminalSettings?.copyOnSelect ?? false;
   const rightClickPaste = terminalSettings?.rightClickPaste ?? true;
 
@@ -88,6 +89,7 @@ export function TerminalArea({
             fontFamily={fontFamily}
             cursorStyle={cursorStyle}
             cursorBlink={cursorBlink}
+            scrollback={scrollback}
             copyOnSelect={copyOnSelect}
             rightClickPaste={rightClickPaste}
             onSearchOpen={handleOpenSearch}

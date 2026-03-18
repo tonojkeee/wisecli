@@ -3,9 +3,12 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { WebglAddon } from "@xterm/addon-webgl";
+import { LigaturesAddon } from "@xterm/addon-ligatures";
 import "@xterm/xterm/css/xterm.css";
 import { cn } from "@renderer/lib/utils";
 import { getTerminalTheme } from "@renderer/lib/terminal-theme";
+import { TERMINAL_CONFIG } from "@renderer/lib/terminal-config";
 import { useEffectiveTheme } from "@renderer/stores/useSettingsStore";
 
 const TERMINAL_DEBUG = import.meta.env.DEV;
@@ -22,6 +25,7 @@ interface TerminalViewProps {
   fontFamily?: string;
   cursorStyle?: "block" | "underline" | "bar";
   cursorBlink?: boolean;
+  scrollback?: number;
   copyOnSelect?: boolean;
   rightClickPaste?: boolean;
   className?: string;
@@ -63,6 +67,7 @@ const arePropsEqual = (prevProps: TerminalViewProps, nextProps: TerminalViewProp
     prevProps.fontFamily === nextProps.fontFamily &&
     prevProps.cursorStyle === nextProps.cursorStyle &&
     prevProps.cursorBlink === nextProps.cursorBlink &&
+    prevProps.scrollback === nextProps.scrollback &&
     prevProps.copyOnSelect === nextProps.copyOnSelect &&
     prevProps.rightClickPaste === nextProps.rightClickPaste
   );
@@ -79,6 +84,7 @@ const TerminalViewComponent = ({
   fontFamily = getDefaultFontFamily(),
   cursorStyle = "block",
   cursorBlink = true,
+  scrollback = TERMINAL_CONFIG.DEFAULT_SCROLLBACK,
   copyOnSelect = false,
   rightClickPaste = true,
   className,
@@ -89,6 +95,7 @@ const TerminalViewComponent = ({
   const terminalInstanceRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
+  const webglAddonRef = useRef<WebglAddon | null>(null);
   const lastBufferLengthRef = useRef(0);
   const lastOutputVersionRef = useRef(0);
   const currentAgentIdRef = useRef<string | null>(null);
@@ -228,10 +235,12 @@ const TerminalViewComponent = ({
     }
 
     // Process a much larger burst per frame for minimal latency.
-    const MAX_CHUNKS_PER_FRAME = 120;
-    const MAX_QUEUE_SIZE = 2000;
+    const MAX_CHUNKS_PER_FRAME = TERMINAL_CONFIG.MAX_CHUNKS_PER_FRAME;
+    const MAX_QUEUE_SIZE = TERMINAL_CONFIG.MAX_QUEUE_SIZE;
     if (queue.length > MAX_QUEUE_SIZE) {
-      queue.splice(0, queue.length - MAX_QUEUE_SIZE);
+      const dropped = queue.length - MAX_QUEUE_SIZE;
+      console.warn(`[TerminalView] Queue overflow, dropping ${dropped} old chunks`);
+      queue.splice(0, dropped);
     }
     const batch = queue.splice(0, MAX_CHUNKS_PER_FRAME);
     let combined = writeBufferRef.current;
@@ -318,7 +327,7 @@ const TerminalViewComponent = ({
       fontSize,
       fontFamily,
       theme: getTerminalTheme(effectiveTheme === "dark"),
-      scrollback: 5000, // Reduced to prevent memory issues
+      scrollback,
     });
 
     const fitAddon = new FitAddon();
@@ -328,6 +337,31 @@ const TerminalViewComponent = ({
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(searchAddon);
     terminal.loadAddon(webLinksAddon);
+
+    // Try to load WebGL renderer with graceful fallback
+    if (TERMINAL_CONFIG.WEBGL_FALLBACK_ENABLED) {
+      try {
+        const webglAddon = new WebglAddon();
+        terminal.loadAddon(webglAddon);
+        webglAddonRef.current = webglAddon;
+        if (TERMINAL_DEBUG) {
+          console.debug("[TerminalView] WebGL renderer loaded");
+        }
+      } catch (e) {
+        console.warn("[TerminalView] WebGL not available, using DOM renderer:", e);
+        webglAddonRef.current = null;
+      }
+    }
+
+    // Load ligatures addon for font ligature support
+    try {
+      const ligaturesAddon = new LigaturesAddon();
+      terminal.loadAddon(ligaturesAddon);
+    } catch (e) {
+      if (TERMINAL_DEBUG) {
+        console.debug("[TerminalView] Ligatures addon not loaded:", e);
+      }
+    }
 
     // Open terminal (synchronous in xterm.js)
     terminal.open(terminalRef.current);
@@ -431,6 +465,16 @@ const TerminalViewComponent = ({
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
+      }
+
+      // Dispose WebGL addon before terminal
+      if (webglAddonRef.current) {
+        try {
+          webglAddonRef.current.dispose();
+        } catch {
+          // Ignore disposal errors
+        }
+        webglAddonRef.current = null;
       }
 
       // Dispose terminal
@@ -663,18 +707,16 @@ const TerminalViewComponent = ({
 export function useTerminalManager(agentId: string | null) {
   const handleInput = useCallback(
     (data: string) => {
-      if (agentId) {
-        window.electronAPI.agent.write(agentId, data);
-      }
+      if (!agentId) return;
+      window.electronAPI.agent.write(agentId, data);
     },
     [agentId]
   );
 
   const handleResize = useCallback(
     (cols: number, rows: number) => {
-      if (agentId) {
-        window.electronAPI.agent.resize(agentId, cols, rows);
-      }
+      if (!agentId) return;
+      window.electronAPI.agent.resize(agentId, cols, rows);
     },
     [agentId]
   );
