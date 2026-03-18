@@ -83,7 +83,7 @@ function findMatchingEntries(
   return matchingPaths;
 }
 
-export function FileTree({
+function FileTreeComponent({
   className,
   searchQuery = "",
   onCreateFile,
@@ -507,3 +507,5 @@ export function FileTree({
     </div>
   );
 }
+
+export const FileTree = React.memo(FileTreeComponent);

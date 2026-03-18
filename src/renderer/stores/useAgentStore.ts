@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useSyncExternalStore, useCallback, useMemo } from "react";
+import { useSyncExternalStore, useCallback, useMemo, useRef } from "react";
 import { RingBuffer } from "@shared/utils/RingBuffer";
 import { logger } from "@renderer/lib/logger";
 import { setActiveChatAgent } from "./useChatStore";
@@ -418,16 +418,45 @@ export const useActiveAgent = (): Agent | null => {
 };
 
 export const useAgentsBySession = (sessionId: string): Agent[] => {
-  const agents = useAgentStore((state) => state.agents);
+  const prevResultRef = useRef<AgentMeta[]>([]);
+  const prevSessionIdRef = useRef(sessionId);
 
-  return Array.from(agents.values())
-    .filter((a) => a.sessionId === sessionId)
-    .map((agent) => ({
-      ...agent,
-      outputBuffer: getOutputBuffer(agent.id),
-      outputVersion: getOutputVersion(agent.id),
-      lastOutputChunk: "",
-    }));
+  const sessionAgents = useAgentStore((state) => {
+    if (prevSessionIdRef.current !== sessionId) {
+      prevSessionIdRef.current = sessionId;
+      prevResultRef.current = [];
+    }
+
+    const filtered: AgentMeta[] = [];
+    for (const agent of state.agents.values()) {
+      if (agent.sessionId === sessionId) {
+        filtered.push(agent);
+      }
+    }
+    filtered.sort((a, b) => a.id.localeCompare(b.id));
+
+    const prev = prevResultRef.current;
+    if (
+      prev.length === filtered.length &&
+      prev.every((p, i) => p.id === filtered[i]?.id && p.status === filtered[i]?.status)
+    ) {
+      return prev;
+    }
+
+    prevResultRef.current = filtered;
+    return filtered;
+  });
+
+  return useMemo(
+    () =>
+      sessionAgents.map((agent) => ({
+        ...agent,
+        outputBuffer: getOutputBuffer(agent.id),
+        outputVersion: getOutputVersion(agent.id),
+        lastOutputChunk: "",
+      })),
+    [sessionAgents]
+  );
 };
 
 // Hook for getting output buffer with automatic updates (optimized)

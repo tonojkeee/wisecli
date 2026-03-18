@@ -80,7 +80,7 @@ const FileIcon = ({ extension, className }: { extension?: string; className?: st
   return <File className={cn("text-muted-foreground", className)} />;
 };
 
-export function FileTreeItem({
+function FileTreeItemComponent({
   entry,
   depth,
   isExpanded,
@@ -201,6 +201,72 @@ export function FileTreeItem({
     </div>
   );
 }
+
+// Custom comparison function for React.memo
+function arePropsEqual(
+  prevProps: FileTreeItemProps,
+  nextProps: FileTreeItemProps
+): boolean {
+  // Compare primitive props
+  if (
+    prevProps.depth !== nextProps.depth ||
+    prevProps.isExpanded !== nextProps.isExpanded ||
+    prevProps.isSelected !== nextProps.isSelected ||
+    prevProps.highlight !== nextProps.highlight
+  ) {
+    return false;
+  }
+
+  // Compare entry properties
+  const prevEntry = prevProps.entry;
+  const nextEntry = nextProps.entry;
+  if (
+    prevEntry.path !== nextEntry.path ||
+    prevEntry.name !== nextEntry.name ||
+    prevEntry.isDirectory !== nextEntry.isDirectory ||
+    prevEntry.extension !== nextEntry.extension
+  ) {
+    return false;
+  }
+
+  // Compare git status
+  if (prevProps.gitStatus !== nextProps.gitStatus) {
+    return false;
+  }
+
+  // Compare folder git status (shallow comparison)
+  const prevFolderStatus = prevProps.folderGitStatus;
+  const nextFolderStatus = nextProps.folderGitStatus;
+  if (prevFolderStatus !== nextFolderStatus) {
+    if (!prevFolderStatus || !nextFolderStatus) return false;
+    if (
+      prevFolderStatus.hasChanges !== nextFolderStatus.hasChanges ||
+      prevFolderStatus.changedCount !== nextFolderStatus.changedCount
+    ) {
+      return false;
+    }
+  }
+
+  // Compare callback references (they should be stable from zustand)
+  if (
+    prevProps.onToggle !== nextProps.onToggle ||
+    prevProps.onSelect !== nextProps.onSelect ||
+    prevProps.onOpenFile !== nextProps.onOpenFile ||
+    prevProps.onContextMenu !== nextProps.onContextMenu
+  ) {
+    return false;
+  }
+
+  // Children comparison - use React's default shallow comparison
+  // If children reference changed, it likely means content changed
+  if (prevProps.children !== nextProps.children) {
+    return false;
+  }
+
+  return true;
+}
+
+export const FileTreeItem = React.memo(FileTreeItemComponent, arePropsEqual);
 
 // Rename input component
 interface RenameInputProps {

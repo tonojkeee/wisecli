@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState, useImperativeHandle } from "react";
+import React, { memo, useEffect, useRef, useCallback, useState, useImperativeHandle } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -52,7 +52,23 @@ function getDefaultFontFamily(): string {
   return "JetBrains Mono, Menlo, Monaco, Courier New, monospace";
 }
 
-export const TerminalView = ({
+/**
+ * Custom comparison function for React.memo
+ * Compares only the props that affect rendering, */
+const arePropsEqual = (prevProps: TerminalViewProps, nextProps: TerminalViewProps): boolean => {
+  return (
+    prevProps.agentId === nextProps.agentId &&
+    prevProps.outputVersion === nextProps.outputVersion &&
+    prevProps.fontSize === nextProps.fontSize &&
+    prevProps.fontFamily === nextProps.fontFamily &&
+    prevProps.cursorStyle === nextProps.cursorStyle &&
+    prevProps.cursorBlink === nextProps.cursorBlink &&
+    prevProps.copyOnSelect === nextProps.copyOnSelect &&
+    prevProps.rightClickPaste === nextProps.rightClickPaste
+  );
+};
+
+const TerminalViewComponent = ({
   agentId,
   outputBuffer,
   outputVersion,
@@ -665,3 +681,6 @@ export function useTerminalManager(agentId: string | null) {
 
   return { handleInput, handleResize };
 }
+
+// Export the memoized component
+export const TerminalView = memo(TerminalViewComponent, arePropsEqual);

@@ -5,13 +5,9 @@ import { EventEmitter } from "events";
 import { v4 as uuidv4 } from "uuid";
 import type * as Pty from "node-pty";
 import { gitService } from "./GitService.js";
-import { todoParser } from "./TodoParser.js";
-import { claudeCodeServer } from "./ClaudeCodeServer.js";
-import { claudeHooksServer } from "./ClaudeHooksServer.js";
-import { hookScriptsManager } from "./HookScripts.js";
-import { notificationService } from "./NotificationService.js";
 import { RingBuffer } from "@shared/utils/RingBuffer";
 import { debug } from "../utils/debug.js";
+import type { CreateOpenCodeOptions } from "@shared/types/opencode";
 
 const require = createRequire(import.meta.url);
 const pty = require("node-pty") as typeof Pty;
@@ -46,7 +42,7 @@ function sanitizeEnv(env: Record<string, string> | undefined): Record<string, st
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (DANGEROUS_ENV_VARS.includes(key)) {
-      debug.warn(`[AgentProcessManager] Blocking dangerous env var: ${key}`);
+      debug.warn("[OpenCodeAgentManager] Blocking dangerous env var:", key);
       continue;
     }
     sanitized[key] = value;
@@ -55,7 +51,7 @@ function sanitizeEnv(env: Record<string, string> | undefined): Record<string, st
 }
 
 let resolvedLoginShellPath: Promise<string | null> | null = null;
-let resolvedClaudeCommandPath: Promise<string | null> | null = null;
+let resolvedOpenCodeCommandPath: Promise<string | null> | null = null;
 
 function resolveLoginShellPath(): Promise<string | null> {
   if (resolvedLoginShellPath) {
@@ -67,7 +63,7 @@ function resolveLoginShellPath(): Promise<string | null> {
       const shell = process.env.ComSpec || "cmd.exe";
       execFile(shell, ["/d", "/s", "/c", "echo %PATH%"], { timeout: 3000 }, (error, stdout) => {
         if (error) {
-          debug.warn("[AgentProcessManager] Failed to resolve Windows shell PATH:", error.message);
+          debug.warn("[OpenCodeAgentManager] Failed to resolve Windows shell PATH:", error.message);
           resolve(null);
           return;
         }
@@ -84,7 +80,7 @@ function resolveLoginShellPath(): Promise<string | null> {
     const shell = process.env.SHELL || "/bin/sh";
     execFile(shell, ["-lic", 'printf "%s" "$PATH"'], { timeout: 3000 }, (error, stdout) => {
       if (error) {
-        debug.warn("[AgentProcessManager] Failed to resolve login shell PATH:", error.message);
+        debug.warn("[OpenCodeAgentManager] Failed to resolve login shell PATH:", error.message);
         resolve(null);
         return;
       }
@@ -97,17 +93,17 @@ function resolveLoginShellPath(): Promise<string | null> {
   return resolvedLoginShellPath;
 }
 
-function resolveClaudeCommandPath(): Promise<string | null> {
-  if (resolvedClaudeCommandPath) {
-    return resolvedClaudeCommandPath;
+function resolveOpenCodeCommandPath(): Promise<string | null> {
+  if (resolvedOpenCodeCommandPath) {
+    return resolvedOpenCodeCommandPath;
   }
 
-  resolvedClaudeCommandPath = new Promise((resolve) => {
+  resolvedOpenCodeCommandPath = new Promise((resolve) => {
     if (isWindows) {
       const shell = process.env.ComSpec || "cmd.exe";
-      execFile(shell, ["/d", "/s", "/c", "where claude.cmd"], { timeout: 3000 }, (error, stdout) => {
+      execFile(shell, ["/d", "/s", "/c", "where opencode.exe"], { timeout: 3000 }, (error, stdout) => {
         if (error) {
-          debug.warn("[AgentProcessManager] Failed to resolve Claude CLI on Windows:", error.message);
+          debug.warn("[OpenCodeAgentManager] Failed to resolve OpenCode CLI on Windows:", error.message);
           resolve(null);
           return;
         }
@@ -122,9 +118,9 @@ function resolveClaudeCommandPath(): Promise<string | null> {
       return;
     }
 
-    execFile("/usr/bin/env", ["sh", "-lc", "command -v claude"], { timeout: 3000 }, (error, stdout) => {
+    execFile("/usr/bin/env", ["sh", "-lc", "command -v opencode"], { timeout: 3000 }, (error, stdout) => {
       if (error) {
-        debug.warn("[AgentProcessManager] Failed to resolve Claude CLI:", error.message);
+        debug.warn("[OpenCodeAgentManager] Failed to resolve OpenCode CLI:", error.message);
         resolve(null);
         return;
       }
@@ -134,10 +130,10 @@ function resolveClaudeCommandPath(): Promise<string | null> {
     });
   });
 
-  return resolvedClaudeCommandPath;
+  return resolvedOpenCodeCommandPath;
 }
 
-export interface Agent {
+export interface OpenCodeAgent {
   id: string;
   sessionId: string;
   pty: Pty.IPty;
@@ -145,27 +141,14 @@ export interface Agent {
   status: "starting" | "running" | "idle" | "error" | "exited";
   createdAt: Date;
   lastActivity: Date;
-  claudeSessionId?: string; // Claude CLI session ID for resume functionality
+  openCodeSessionId?: string; // For resume functionality
 }
 
-export interface CreateAgentOptions {
-  sessionId: string;
-  workingDirectory: string;
-  env?: Record<string, string>;
-  resumeSessionId?: string; // Optional Claude session ID to resume
-}
-
-class AgentProcessManager extends EventEmitter {
-  private agents: Map<string, Agent> = new Map();
+class OpenCodeAgentManager extends EventEmitter {
+  private agents: Map<string, OpenCodeAgent> = new Map();
   private mainWindow: BrowserWindow | null = null;
   private outputBuffers: Map<string, RingBuffer<string>> = new Map();
   private readonly MAX_BUFFER_SIZE = 1000;
-
-  // Todo parsing buffer (accumulates recent output for parsing)
-  private todoParseBuffers: Map<string, string> = new Map();
-  private todoParseTimeouts: Map<string, NodeJS.Timeout> = new Map();
-  private readonly TODO_PARSE_BUFFER_SIZE = 50000; // Keep last 50KB for todo parsing
-  private readonly TODO_PARSE_DEBOUNCE_MS = 300; // Debounce todo parsing to reduce CPU load
 
   // Output batching to prevent IPC flooding
   private pendingOutputs: Map<string, { data: string; timestamp: number }[]> = new Map();
@@ -181,82 +164,47 @@ class AgentProcessManager extends EventEmitter {
     this.mainWindow = window;
   }
 
-  async createAgent(options: CreateAgentOptions): Promise<Agent> {
+  async createAgent(options: CreateOpenCodeOptions): Promise<OpenCodeAgent> {
     const { sessionId, workingDirectory, env = {}, resumeSessionId } = options;
     const agentId = uuidv4();
 
     // Initialize output buffer with RingBuffer for O(1) operations
     this.outputBuffers.set(agentId, new RingBuffer<string>(this.MAX_BUFFER_SIZE));
 
-    // Ensure hooks server is started for status line updates
-    // Each step has its own try-catch to allow partial functionality
-    if (!claudeHooksServer.isStarted()) {
-      try {
-        await claudeHooksServer.start();
-      } catch (err) {
-        debug.error("[AgentProcessManager] Hooks server start failed:", err);
-        // Continue without hooks - agent can still function
-      }
-
-      try {
-        await hookScriptsManager.ensureInstalled();
-      } catch (err) {
-        debug.error("[AgentProcessManager] Hook scripts install failed:", err);
-        // Continue without hook scripts
-      }
-    }
-
-    // Set current agent for status line updates
-    claudeHooksServer.setCurrentAgent(agentId);
-
-    // Ensure Claude Code server is started for IDE integration
-    if (!claudeCodeServer.isActive()) {
-      try {
-        await claudeCodeServer.start([workingDirectory]);
-      } catch (err) {
-        debug.error("[AgentProcessManager] Claude code server start failed:", err);
-        // Continue without IDE integration
-      }
-    }
-
     // Get git context for the working directory
     let gitContext = "";
     try {
       gitContext = await gitService.getChangedFilesContext(workingDirectory);
     } catch (error) {
-      debug.debug("[AgentProcessManager] Failed to get git context:", error);
+      debug.debug("[OpenCodeAgentManager] Failed to get git context:", error);
     }
 
     const loginShellPath = await resolveLoginShellPath();
 
-    // Build environment with IDE integration
-    const ideEnv: Record<string, string> = {
-      // Mark this as a WiseCLI terminal for hooks
+    // Build environment
+    const processEnv: Record<string, string> = {
+      // Mark this as a WiseCLI terminal
       WISECLI_TERMINAL: "1",
     };
-    if (claudeCodeServer.isActive()) {
-      ideEnv.CLAUDE_CODE_SSE_PORT = claudeCodeServer.getPort().toString();
-      ideEnv.ENABLE_IDE_INTEGRATION = "true";
-    }
 
-    // Create PTY process with git context and IDE integration in environment
+    // Create PTY process with git context in environment
     // Sanitize user-provided env vars to prevent injection of dangerous values
-    const resolvedClaudePath = await resolveClaudeCommandPath();
-    const claudeCommand = resolvedClaudePath || (isWindows ? "claude.cmd" : "claude");
+    const resolvedOpenCodePath = await resolveOpenCodeCommandPath();
+    const openCodeCommand = resolvedOpenCodePath || (isWindows ? "opencode.exe" : "opencode");
 
-    if (isWindows && !resolvedClaudePath) {
+    if (isWindows && !resolvedOpenCodePath) {
       throw new Error(
-        "Claude CLI not found in PATH. Please install Claude Code and ensure `claude.cmd` is available in your system PATH."
+        "OpenCode CLI not found in PATH. Please install OpenCode and ensure `opencode.exe` is available in your system PATH."
       );
     }
 
-    debug.log("[AgentProcessManager] Using Claude executable:", claudeCommand);
+    debug.log("[OpenCodeAgentManager] Using OpenCode executable:", openCodeCommand);
 
     // Build spawn args - add --resume flag if we have a session ID to resume
     const spawnArgs: string[] = [];
     if (resumeSessionId) {
       spawnArgs.push("--resume", resumeSessionId);
-      debug.log("[AgentProcessManager] Resuming Claude session:", resumeSessionId);
+      debug.log("[OpenCodeAgentManager] Resuming OpenCode session:", resumeSessionId);
     }
 
     // Build PTY options with platform-specific settings
@@ -271,8 +219,8 @@ class AgentProcessManager extends EventEmitter {
         TERM: "xterm-256color",
         // Add git context if available
         ...(gitContext ? { GIT_CHANGED_FILES_CONTEXT: gitContext } : {}),
-        // Add IDE integration env vars
-        ...ideEnv,
+        // Add process env vars
+        ...processEnv,
         // Sanitize user-provided env vars to prevent injection
         ...sanitizeEnv(env),
       },
@@ -280,9 +228,9 @@ class AgentProcessManager extends EventEmitter {
       ...(isWindows && { useConpty: true, encoding: "utf8" as BufferEncoding }),
     };
 
-    const ptyProcess = pty.spawn(claudeCommand, spawnArgs, ptyOptions);
+    const ptyProcess = pty.spawn(openCodeCommand, spawnArgs, ptyOptions);
 
-    const agent: Agent = {
+    const agent: OpenCodeAgent = {
       id: agentId,
       sessionId,
       pty: ptyProcess,
@@ -291,7 +239,7 @@ class AgentProcessManager extends EventEmitter {
       createdAt: new Date(),
       lastActivity: new Date(),
       // Preserve the resumed session ID if provided
-      ...(resumeSessionId && { claudeSessionId: resumeSessionId }),
+      ...(resumeSessionId && { openCodeSessionId: resumeSessionId }),
     };
 
     this.agents.set(agentId, agent);
@@ -310,7 +258,7 @@ class AgentProcessManager extends EventEmitter {
     const statusTimeout = setTimeout(() => {
       const currentAgent = this.agents.get(agentId);
       debug.log(
-        "[AgentProcessManager] Timeout fired for agent:",
+        "[OpenCodeAgentManager] Timeout fired for agent:",
         agentId,
         "status:",
         currentAgent?.status
@@ -319,7 +267,7 @@ class AgentProcessManager extends EventEmitter {
         currentAgent.status = "running";
         this.emit("agent:status", { agentId, status: "running" });
         debug.log(
-          "[AgentProcessManager] Sending status to renderer, mainWindow:",
+          "[OpenCodeAgentManager] Sending status to renderer, mainWindow:",
           !!this.mainWindow
         );
         this.sendToRenderer("agent:status", { agentId, status: "running" });
@@ -346,55 +294,8 @@ class AgentProcessManager extends EventEmitter {
     }
     buffer.push(data);
 
-    // Accumulate output for todo parsing
-    this.accumulateForTodoParsing(agentId, data);
-
     // Batch output instead of immediate send to prevent IPC flooding
     this.batchOutput(agentId, data);
-  }
-
-  /**
-   * Accumulate output for todo parsing with a rolling buffer
-   * Uses debouncing to prevent excessive parsing on rapid output
-   */
-  private accumulateForTodoParsing(agentId: string, data: string): void {
-    let currentBuffer = this.todoParseBuffers.get(agentId) || "";
-    currentBuffer += data;
-
-    // Trim if too large (keep the end for most recent context)
-    if (currentBuffer.length > this.TODO_PARSE_BUFFER_SIZE) {
-      currentBuffer = currentBuffer.slice(-this.TODO_PARSE_BUFFER_SIZE);
-    }
-
-    this.todoParseBuffers.set(agentId, currentBuffer);
-
-    // Debounce todo parsing - only parse after output settles
-    const existingTimeout = this.todoParseTimeouts.get(agentId);
-    if (existingTimeout) {
-      clearTimeout(existingTimeout);
-    }
-
-    this.todoParseTimeouts.set(
-      agentId,
-      setTimeout(() => {
-        this.todoParseTimeouts.delete(agentId);
-        this.parseAndEmitTodos(agentId, currentBuffer);
-      }, this.TODO_PARSE_DEBOUNCE_MS)
-    );
-  }
-
-  /**
-   * Parse output for todos and emit to renderer
-   */
-  private parseAndEmitTodos(agentId: string, output: string): void {
-    const result = todoParser.parseOutput(output);
-
-    if (result.found) {
-      this.sendToRenderer("agent:todos", {
-        agentId,
-        todos: result.todos,
-      });
-    }
   }
 
   private batchOutput(agentId: string, data: string): void {
@@ -439,7 +340,7 @@ class AgentProcessManager extends EventEmitter {
     const latestTimestamp = batch[batch.length - 1].timestamp;
 
     // Send to renderer
-    this.sendToRenderer("agent:output", {
+    this.sendToRenderer("opencode:output", {
       agentId,
       data: combinedData,
       timestamp: latestTimestamp,
@@ -452,16 +353,13 @@ class AgentProcessManager extends EventEmitter {
 
     agent.status = "exited";
     this.emit("agent:status", { agentId, status: "exited", exitCode });
-    this.sendToRenderer("agent:exited", { agentId, exitCode });
-
-    // Send notification
-    notificationService.notifyAgentComplete(agentId, exitCode);
+    this.sendToRenderer("opencode:exited", { agentId, exitCode });
   }
 
   writeToAgent(agentId: string, data: string): void {
     const agent = this.agents.get(agentId);
     if (!agent || agent.status === "exited") {
-      throw new Error(`Agent ${agentId} not found or has exited`);
+      throw new Error(`OpenCode agent ${agentId} not found or has exited`);
     }
 
     agent.pty.write(data);
@@ -478,7 +376,7 @@ class AgentProcessManager extends EventEmitter {
   killAgent(agentId: string): void {
     // Prevent race condition: check if already being killed
     if (this.agentKillState.get(agentId)) {
-      debug.log("[AgentProcessManager] Agent already being killed:", agentId);
+      debug.log("[OpenCodeAgentManager] Agent already being killed:", agentId);
       return;
     }
 
@@ -504,12 +402,6 @@ class AgentProcessManager extends EventEmitter {
       this.flushTimeouts.delete(agentId);
     }
 
-    const todoParseTimeout = this.todoParseTimeouts.get(agentId);
-    if (todoParseTimeout) {
-      clearTimeout(todoParseTimeout);
-      this.todoParseTimeouts.delete(agentId);
-    }
-
     // Flush pending outputs before clearing to prevent data loss
     if (this.pendingOutputs.has(agentId)) {
       this.flushOutputBatch(agentId);
@@ -533,32 +425,31 @@ class AgentProcessManager extends EventEmitter {
     agent.status = "exited";
     this.agents.delete(agentId);
     this.outputBuffers.delete(agentId);
-    this.todoParseBuffers.delete(agentId);
     this.agentKillState.delete(agentId);
     this.emit("agent:killed", { agentId });
   }
 
-  getAgent(agentId: string): Agent | undefined {
+  getAgent(agentId: string): OpenCodeAgent | undefined {
     return this.agents.get(agentId);
   }
 
-  getAllAgents(): Agent[] {
+  getAllAgents(): OpenCodeAgent[] {
     return Array.from(this.agents.values());
   }
 
-  getAgentsBySession(sessionId: string): Agent[] {
+  getAgentsBySession(sessionId: string): OpenCodeAgent[] {
     return Array.from(this.agents.values()).filter((a) => a.sessionId === sessionId);
   }
 
   /**
-   * Get the last agent with a Claude session ID for a given session
+   * Get the last agent with an OpenCode session ID for a given session
    * Used to find resumable sessions
    */
-  getLastAgentWithClaudeSession(sessionId: string): Agent | undefined {
+  getLastAgentWithOpenCodeSession(sessionId: string): OpenCodeAgent | undefined {
     const sessionAgents = this.getAgentsBySession(sessionId);
-    // Find the most recent agent with a claudeSessionId
+    // Find the most recent agent with an openCodeSessionId
     return sessionAgents
-      .filter((a) => a.claudeSessionId)
+      .filter((a) => a.openCodeSessionId)
       .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())[0];
   }
 
@@ -571,28 +462,28 @@ class AgentProcessManager extends EventEmitter {
    * Called when user switches between agents in the UI
    */
   setActiveAgent(agentId: string | null): void {
-    debug.log("[AgentProcessManager] setActiveAgent called:", agentId);
-    claudeHooksServer.setCurrentAgent(agentId);
+    debug.log("[OpenCodeAgentManager] setActiveAgent called:", agentId);
+    // Future: route to OpenCode hooks server when implemented
   }
 
   /**
-   * Update the Claude session ID for an agent
-   * Called when Claude CLI sends session_id via hooks
+   * Update the OpenCode session ID for an agent
+   * Called when OpenCode CLI sends session_id via hooks
    */
-  updateClaudeSessionId(agentId: string, claudeSessionId: string): void {
+  updateOpenCodeSessionId(agentId: string, openCodeSessionId: string): void {
     const agent = this.agents.get(agentId);
     if (agent) {
-      agent.claudeSessionId = claudeSessionId;
-      debug.log("[AgentProcessManager] Updated claudeSessionId for agent:", agentId.slice(0, 8));
+      agent.openCodeSessionId = openCodeSessionId;
+      debug.log("[OpenCodeAgentManager] Updated openCodeSessionId for agent:", agentId.slice(0, 8));
     }
   }
 
   /**
-   * Get the Claude session ID for an agent
+   * Get the OpenCode session ID for an agent
    */
-  getClaudeSessionId(agentId: string): string | undefined {
+  getOpenCodeSessionId(agentId: string): string | undefined {
     const agent = this.agents.get(agentId);
-    return agent?.claudeSessionId;
+    return agent?.openCodeSessionId;
   }
 
   private sendToRenderer(channel: string, data: unknown): void {
@@ -614,12 +505,6 @@ class AgentProcessManager extends EventEmitter {
     }
     this.flushTimeouts.clear();
 
-    // Clear all todo parse timeouts
-    for (const timeout of this.todoParseTimeouts.values()) {
-      clearTimeout(timeout);
-    }
-    this.todoParseTimeouts.clear();
-
     // Clear pending outputs
     this.pendingOutputs.clear();
 
@@ -630,4 +515,4 @@ class AgentProcessManager extends EventEmitter {
   }
 }
 
-export const agentProcessManager = new AgentProcessManager();
+export const openCodeAgentManager = new OpenCodeAgentManager();

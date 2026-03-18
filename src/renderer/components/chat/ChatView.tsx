@@ -1,4 +1,4 @@
-import * as React from "react";
+import React, { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Sparkles, ArrowUpRight, RefreshCw } from "lucide-react";
 import { cn } from "@renderer/lib/utils";

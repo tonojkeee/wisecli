@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { cn } from "@renderer/lib/utils";
 import { SidebarRail } from "./SidebarRail";
 import { SidebarSection } from "./SidebarSection";
@@ -55,7 +55,24 @@ interface SidebarProps {
   className?: string;
 }
 
-export function Sidebar({
+function arePropsEqual(prevProps: SidebarProps, nextProps: SidebarProps): boolean {
+  return (
+    prevProps.activeSection === nextProps.activeSection &&
+    prevProps.activeSessionId === nextProps.activeSessionId &&
+    prevProps.activeAgentId === nextProps.activeAgentId &&
+    prevProps.collapsed === nextProps.collapsed &&
+    prevProps.sessions.length === nextProps.sessions.length &&
+    prevProps.agents.length === nextProps.agents.length &&
+    prevProps.searchQuery === nextProps.searchQuery &&
+    prevProps.projectPath === nextProps.projectPath &&
+    prevProps.openFilesCount === nextProps.openFilesCount &&
+    prevProps.pendingTasksCount === nextProps.pendingTasksCount &&
+    prevProps.streamingChatsCount === nextProps.streamingChatsCount &&
+    prevProps.className === nextProps.className
+  );
+}
+
+const SidebarComponent = function Sidebar({
   activeSection,
   onSectionChange,
   searchQuery,
@@ -180,4 +197,6 @@ export function Sidebar({
       </div>
     </div>
   );
-}
+};
+
+export const Sidebar = memo(SidebarComponent, arePropsEqual);

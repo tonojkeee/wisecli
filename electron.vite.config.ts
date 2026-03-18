@@ -54,6 +54,16 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, "src/renderer/index.html"),
         },
+        output: {
+          manualChunks: {
+            "vendor-react": ["react", "react-dom"],
+            "vendor-monaco": ["monaco-editor", "@monaco-editor/react"],
+            "vendor-terminal": ["@xterm/xterm", "@xterm/addon-fit", "@xterm/addon-search", "@xterm/addon-web-links"],
+            "vendor-ui": ["@radix-ui/react-dropdown-menu", "@radix-ui/react-tooltip"],
+            "vendor-state": ["zustand"],
+            "vendor-utils": ["uuid", "fast-diff"],
+          },
+        },
       },
       target: "esnext",
     },
