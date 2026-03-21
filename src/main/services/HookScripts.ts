@@ -63,7 +63,7 @@ exit 0
 /**
  * CMD wrapper script for Windows
  */
-const STATUSLINE_SCRIPT_CMD = `@echo off\r\nif "%WISECLI_TERMINAL%"=="" exit /b 0\r\npowershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0statusline.ps1"\r\nexit /b 0\r\n`;
+const STATUSLINE_SCRIPT_CMD = `@echo off\r\nif "%WISECLI_TERMINAL%"=="" exit /b 0\r\npowershell -NoProfile -ExecutionPolicy Bypass -Command "& { . '%~dp0statusline.ps1' }"\r\nexit /b 0\r\n`;
 
 /**
  * Hook Scripts Manager

@@ -188,7 +188,17 @@ function createWindow(): void {
 
   // HMR for renderer base on electron-vite cli
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+    // Retry loading the dev server URL to handle startup race condition
+    const loadDevURL = (retries = 5): void => {
+      mainWindow!.webContents
+        .loadURL(process.env["ELECTRON_RENDERER_URL"]!)
+        .catch(() => {
+          if (retries > 0) {
+            setTimeout(() => loadDevURL(retries - 1), 200);
+          }
+        });
+    };
+    loadDevURL();
   } else {
     mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
