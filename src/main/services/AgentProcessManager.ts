@@ -117,6 +117,9 @@ function resolveClaudeCommandPath(): Promise<string | null> {
             process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "npm", "claude.cmd") : null,
             process.env.NVM_SYMLINK ? path.join(process.env.NVM_SYMLINK, "claude.cmd") : null,
             process.env.NVM_HOME ? path.join(process.env.NVM_HOME, "claude.cmd") : null,
+            // Claude CLI installed via official installer (Windows .exe)
+            process.env.USERPROFILE ? path.join(process.env.USERPROFILE, ".local", "bin", "claude.exe") : null,
+            process.env.HOME ? path.join(process.env.HOME, ".local", "bin", "claude.exe") : null,
           ].filter(Boolean) as string[];
 
           for (const fallbackPath of fallbackPaths) {
@@ -286,11 +289,17 @@ class AgentProcessManager extends EventEmitter {
       const npmLocal = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "npm") : null;
       const nvmSymlink = process.env.NVM_SYMLINK;
       const nvmHome = process.env.NVM_HOME;
+      const userLocalBin = process.env.USERPROFILE
+        ? path.join(process.env.USERPROFILE, ".local", "bin")
+        : process.env.HOME
+          ? path.join(process.env.HOME, ".local", "bin")
+          : null;
 
       if (npmGlobal && existsSync(npmGlobal)) additionalPaths.push(npmGlobal);
       if (npmLocal && existsSync(npmLocal)) additionalPaths.push(npmLocal);
       if (nvmSymlink && existsSync(nvmSymlink)) additionalPaths.push(nvmSymlink);
       if (nvmHome && existsSync(nvmHome) && !nvmSymlink) additionalPaths.push(nvmHome);
+      if (userLocalBin && existsSync(userLocalBin)) additionalPaths.push(userLocalBin);
 
       if (additionalPaths.length > 0) {
         enhancedPath = enhancedPath + pathSep + additionalPaths.join(pathSep);
@@ -323,13 +332,18 @@ class AgentProcessManager extends EventEmitter {
     let ptyProcess: Pty.IPty;
     try {
       if (isWindows) {
-        // On Windows, pass command through cmd.exe for proper .cmd file handling
-        // /s flag handles quote stripping; wrap claudeCommand in quotes for paths with spaces
-        const shell = process.env.ComSpec || "cmd.exe";
-        const quotedCommand = claudeCommand.includes(" ") ? `"${claudeCommand}"` : claudeCommand;
-        const cmdArgs = ["/d", "/s", "/c", quotedCommand, ...spawnArgs];
-        debug.log("[AgentProcessManager] Windows spawn:", shell, cmdArgs.join(" "));
-        ptyProcess = pty.spawn(shell, cmdArgs, ptyOptions);
+        if (claudeCommand.endsWith(".cmd") || claudeCommand.endsWith(".bat")) {
+          // .cmd/.bat files need cmd.exe wrapper
+          const shell = process.env.ComSpec || "cmd.exe";
+          const quotedCommand = claudeCommand.includes(" ") ? `"${claudeCommand}"` : claudeCommand;
+          const cmdArgs = ["/d", "/s", "/c", quotedCommand, ...spawnArgs];
+          debug.log("[AgentProcessManager] Windows spawn (cmd.exe):", shell, cmdArgs.join(" "));
+          ptyProcess = pty.spawn(shell, cmdArgs, ptyOptions);
+        } else {
+          // Direct binary (e.g., claude installed via official installer)
+          debug.log("[AgentProcessManager] Windows spawn (direct):", claudeCommand, spawnArgs.join(" "));
+          ptyProcess = pty.spawn(claudeCommand, spawnArgs, ptyOptions);
+        }
       } else {
         ptyProcess = pty.spawn(claudeCommand, spawnArgs, ptyOptions);
       }
