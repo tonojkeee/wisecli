@@ -1,0 +1,1 @@
+export { GitLogDialog } from "./GitLogDialog";

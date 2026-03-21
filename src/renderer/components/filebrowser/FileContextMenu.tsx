@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { File, FolderPlus, FilePlus, Pencil, Trash2, Copy, RefreshCw } from "lucide-react";
+import { File, FolderPlus, FilePlus, Pencil, Trash2, Copy, RefreshCw, GitCommit } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 
 export interface ContextMenuPosition {
@@ -12,6 +12,7 @@ interface FileContextMenuProps {
   position: ContextMenuPosition;
   targetPath: string | null;
   isDirectory: boolean;
+  isGitRepo: boolean;
   onClose: () => void;
   onCreateFile: (parentPath: string) => void;
   onCreateDirectory: (parentPath: string) => void;
@@ -19,12 +20,14 @@ interface FileContextMenuProps {
   onDelete: (path: string) => void;
   onCopyPath?: (path: string) => void;
   onRefresh?: (path: string) => void;
+  onViewGitHistory?: () => void;
 }
 
 export function FileContextMenu({
   position,
   targetPath,
   isDirectory,
+  isGitRepo,
   onClose,
   onCreateFile,
   onCreateDirectory,
@@ -32,6 +35,7 @@ export function FileContextMenu({
   onDelete,
   onCopyPath,
   onRefresh,
+  onViewGitHistory,
 }: FileContextMenuProps) {
   const { t } = useTranslation("filebrowser");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -113,6 +117,13 @@ export function FileContextMenu({
     }
   };
 
+  const handleViewGitHistory = () => {
+    if (onViewGitHistory) {
+      onViewGitHistory();
+      onClose();
+    }
+  };
+
   return (
     <div
       ref={menuRef}
@@ -138,6 +149,16 @@ export function FileContextMenu({
             onClick={handleCreateDirectory}
           />
           <ContextMenuSeparator />
+          {isGitRepo && (
+            <>
+              <ContextMenuItem
+                icon={<GitCommit className="h-4 w-4" />}
+                label={t("gitHistory")}
+                onClick={handleViewGitHistory}
+              />
+              <ContextMenuSeparator />
+            </>
+          )}
           <ContextMenuItem
             icon={<RefreshCw className="h-4 w-4" />}
             label={t("contextMenu.refresh")}
@@ -164,6 +185,16 @@ export function FileContextMenu({
             onClick={() => onClose()}
           />
           <ContextMenuSeparator />
+          {isGitRepo && (
+            <>
+              <ContextMenuItem
+                icon={<GitCommit className="h-4 w-4" />}
+                label={t("gitHistory")}
+                onClick={handleViewGitHistory}
+              />
+              <ContextMenuSeparator />
+            </>
+          )}
           <ContextMenuItem
             icon={<Pencil className="h-4 w-4" />}
             label={t("contextMenu.rename")}
@@ -219,19 +250,23 @@ function ContextMenuSeparator() {
 interface EmptySpaceContextMenuProps {
   position: ContextMenuPosition;
   currentPath: string;
+  isGitRepo: boolean;
   onClose: () => void;
   onCreateFile: (parentPath: string) => void;
   onCreateDirectory: (parentPath: string) => void;
   onRefresh?: (path: string) => void;
+  onViewGitHistory?: () => void;
 }
 
 export function EmptySpaceContextMenu({
   position,
   currentPath,
+  isGitRepo,
   onClose,
   onCreateFile,
   onCreateDirectory,
   onRefresh,
+  onViewGitHistory,
 }: EmptySpaceContextMenuProps) {
   const { t } = useTranslation("filebrowser");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -295,6 +330,21 @@ export function EmptySpaceContextMenu({
             onClick={() => {
               onRefresh(currentPath);
               onClose();
+            }}
+          />
+        </>
+      )}
+      {isGitRepo && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            icon={<GitCommit className="h-4 w-4" />}
+            label={t("gitHistory")}
+            onClick={() => {
+              if (onViewGitHistory) {
+                onViewGitHistory();
+                onClose();
+              }
             }}
           />
         </>

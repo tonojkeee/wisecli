@@ -46,5 +46,27 @@
       "delete": "Delete",
       "cancel": "Cancel"
     }
+  },
+
+  "gitHistory": "View Git History",
+
+  "gitLog": {
+    "title": "Git History",
+    "noCommits": "No commits found",
+    "loading": "Loading commits...",
+    "selectCommit": "Select a commit to view changes",
+    "selectFile": "Select a file to view diff",
+    "binaryFile": "Binary file (cannot display)",
+    "diffTooLarge": "Diff too large to display",
+    "changedFiles": "Changed files",
+    "commits": "Commits",
+    "author": "Author",
+    "date": "Date",
+    "additions": "additions",
+    "deletions": "deletions",
+    "added": "Added",
+    "modified": "Modified",
+    "deleted": "Deleted",
+    "renamed": "Renamed"
   }
 }

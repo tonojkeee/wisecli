@@ -42,3 +42,34 @@ export interface GitStatusResult {
   behind: number;
   isGitRepo: boolean;
 }
+
+export interface GitLogCommit {
+  hash: string;
+  shortHash: string;
+  message: string;
+  author: string;
+  authorEmail: string;
+  date: string; // ISO string
+  relativeDate: string;
+}
+
+export interface GitLogResult {
+  commits: GitLogCommit[];
+  hasMore: boolean;
+  isGitRepo: boolean;
+}
+
+export interface GitDiffFile {
+  path: string;
+  oldPath?: string; // for renames
+  status: 'A' | 'M' | 'D' | 'R';
+  isBinary: boolean;
+  additions: number;
+  deletions: number;
+}
+
+export interface GitCommitDiffResult {
+  commitHash: string;
+  files: GitDiffFile[];
+  hasMore: boolean; // true if too many files
+}

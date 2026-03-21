@@ -32,6 +32,10 @@ import type {
   GitFileStatus,
   GitStatusEntry,
   GitStatusResult,
+  GitLogCommit,
+  GitLogResult,
+  GitDiffFile,
+  GitCommitDiffResult,
   // Todo types
   Todo,
   TodoEvent,
@@ -58,6 +62,10 @@ import type {
   ToolErrorEvent,
   // Hook types
   HookStatus,
+  GitLogCommit as GitLogCommitType,
+  GitLogResult as GitLogResultType,
+  GitDiffFile as GitDiffFileType,
+  GitCommitDiffResult as GitCommitDiffResultType,
 } from "@shared/types";
 
 // Re-export types for renderer
@@ -89,6 +97,10 @@ export type {
   GitFileStatus,
   GitStatusEntry,
   GitStatusResult,
+  GitLogCommit,
+  GitLogResult,
+  GitDiffFile,
+  GitCommitDiffResult,
   Todo,
   TodoEvent,
   StatuslineEvent,
@@ -401,6 +413,33 @@ const electronAPI = {
 
     getFileAtRef: (repoPath: string, filePath: string, ref?: string): Promise<string | null> =>
       ipcRenderer.invoke("git:get-file-at-ref", repoPath, filePath, ref),
+
+    getLog: (repoPath: string, maxCount?: number): Promise<{
+      commits: {
+        hash: string;
+        shortHash: string;
+        message: string;
+        author: string;
+        authorEmail: string;
+        date: string;
+        relativeDate: string;
+      }[];
+      hasMore: boolean;
+      isGitRepo: boolean;
+    }> => ipcRenderer.invoke("git:get-log", repoPath, maxCount),
+
+    getCommitDiff: (repoPath: string, commitHash: string): Promise<{
+      commitHash: string;
+      files: {
+        path: string;
+        oldPath?: string;
+        status: "A" | "M" | "D" | "R";
+        isBinary: boolean;
+        additions: number;
+        deletions: number;
+      }[];
+      hasMore: boolean;
+    }> => ipcRenderer.invoke("git:get-commit-diff", repoPath, commitHash),
   },
 
   // Claude Code IDE Integration

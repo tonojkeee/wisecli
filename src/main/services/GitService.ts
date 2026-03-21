@@ -72,12 +72,12 @@ function execGitCommand(
 
 /**
  * Validate a git ref to prevent injection
- * Only allow safe characters: alphanumeric, dash, underscore, dot, forward slash, and @
+ * Only allow safe characters: alphanumeric, dash, underscore, dot, forward slash, @, and ^ (for parent refs)
  */
 function isValidGitRef(ref: string): boolean {
-  // Git refs can contain: alphanumeric, -, _, ., /, @, and :
-  // But we want to be more restrictive for safety
-  const safeRefPattern = /^[a-zA-Z0-9_\-./@]+$/;
+  // Git refs can contain: alphanumeric, -, _, ., /, @, : and ^ (for parent refs like HEAD^)
+  // We allow ^ for parent commit references but keep it restrictive for safety
+  const safeRefPattern = /^[a-zA-Z0-9_\-./@^]+$/;
   return safeRefPattern.test(ref) && ref.length < 256;
 }
 
@@ -449,6 +449,217 @@ class GitService {
       // File might not exist at this ref, or ref might be invalid
       debug.debug("[GitService] getFileAtRef error:", error);
       return null;
+    }
+  }
+
+  /**
+   * Get commit log for a repository
+   */
+  async getLog(repoPath: string, maxCount: number = 100): Promise<{
+    commits: {
+      hash: string;
+      shortHash: string;
+      message: string;
+      author: string;
+      authorEmail: string;
+      date: string;
+      relativeDate: string;
+    }[];
+    hasMore: boolean;
+    isGitRepo: boolean;
+  }> {
+    const defaultResult = {
+      commits: [],
+      hasMore: false,
+      isGitRepo: false,
+    };
+
+    try {
+      // Check if it's a git repository
+      const isRepo = await this.isGitRepository(repoPath);
+      if (!isRepo) {
+        return defaultResult;
+      }
+
+      // Format: full hash | short hash | subject | author name | author email | author date (ISO)
+      const { stdout } = await execGitCommand(
+        [
+          "log",
+          `--pretty=format:%H|%h|%s|%an|%ae|%aI`,
+          `-n`,
+          String(maxCount),
+        ],
+        { cwd: repoPath, maxBuffer: 10 * 1024 * 1024 }
+      );
+
+      const lines = stdout.trim().split("\n").filter((line) => line.trim());
+      const commits = lines.map((line) => {
+        const parts = line.split("|");
+        if (parts.length < 6) {
+          return null;
+        }
+        const [hash, shortHash, message, author, authorEmail, date] = parts;
+        return {
+          hash,
+          shortHash,
+          message,
+          author,
+          authorEmail,
+          date,
+          relativeDate: this.getRelativeDate(new Date(date)),
+        };
+      }).filter((commit): commit is NonNullable<typeof commit> => commit !== null);
+
+      return {
+        commits,
+        hasMore: commits.length === maxCount,
+        isGitRepo: true,
+      };
+    } catch (error) {
+      debug.debug("[GitService] getLog error:", error);
+      return defaultResult;
+    }
+  }
+
+  /**
+   * Get diff for a specific commit
+   */
+  async getCommitDiff(repoPath: string, commitHash: string): Promise<{
+    commitHash: string;
+    files: {
+      path: string;
+      oldPath?: string;
+      status: "A" | "M" | "D" | "R";
+      isBinary: boolean;
+      additions: number;
+      deletions: number;
+    }[];
+    hasMore: boolean;
+  }> {
+    const defaultResult = {
+      commitHash,
+      files: [],
+      hasMore: false,
+    };
+
+    try {
+      // Validate commit hash
+      if (!isValidGitRef(commitHash)) {
+        console.warn("[GitService] Invalid commit hash rejected:", commitHash);
+        return defaultResult;
+      }
+
+      // Check if it's a git repository
+      const isRepo = await this.isGitRepository(repoPath);
+      if (!isRepo) {
+        return defaultResult;
+      }
+
+      // Get numstat output: additions\tdeletions\tpath
+      const { stdout } = await execGitCommand(
+        ["show", "--numstat", "--format=", commitHash],
+        { cwd: repoPath, maxBuffer: 10 * 1024 * 1024 }
+      );
+
+      const lines = stdout.trim().split("\n").filter((line) => line.trim());
+      const files: {
+        path: string;
+        oldPath?: string;
+        status: "A" | "M" | "D" | "R";
+        isBinary: boolean;
+        additions: number;
+        deletions: number;
+      }[] = [];
+
+      for (const line of lines) {
+        // Binary files show as "-\t-\t" prefix
+        const isBinary = line.startsWith("-\t-\t");
+
+        // Parse numstat format: additions\tdeletions\tpath
+        // Handle rename format: additions\tdeletes\toldPath => newPath
+        const parts = line.split("\t");
+        if (parts.length < 3) continue;
+
+        const additionsStr = parts[0];
+        const deletionsStr = parts[1];
+        let path = parts[2];
+        let oldPath: string | undefined;
+
+        // Check for rename (oldPath => newPath)
+        const renameMatch = path.match(/^(.+?)\s+=>\s+(.+)$/);
+        if (renameMatch) {
+          oldPath = renameMatch[1];
+          path = renameMatch[2];
+        }
+
+        // Determine status
+        let status: "A" | "M" | "D" | "R" = "M";
+        if (oldPath) {
+          status = "R";
+        } else if (additionsStr === "-" && deletionsStr === "0") {
+          status = "D";
+        } else if (additionsStr !== "-" && deletionsStr === "0") {
+          status = "A";
+        }
+
+        // Parse additions/deletions
+        const additions = isBinary ? 0 : parseInt(additionsStr, 10) || 0;
+        const deletions = isBinary ? 0 : parseInt(deletionsStr, 10) || 0;
+
+        files.push({
+          path,
+          oldPath,
+          status,
+          isBinary,
+          additions,
+          deletions,
+        });
+
+        // Limit to 50 files
+        if (files.length >= 50) {
+          break;
+        }
+      }
+
+      return {
+        commitHash,
+        files,
+        hasMore: lines.length > 50,
+      };
+    } catch (error) {
+      debug.debug("[GitService] getCommitDiff error:", error);
+      return defaultResult;
+    }
+  }
+
+  /**
+   * Get a human-readable relative date string
+   */
+  private getRelativeDate(date: Date): string {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) {
+      return "just now";
+    } else if (diffMins < 60) {
+      return `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays}d ago`;
+    } else if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      return `${weeks}w ago`;
+    } else if (diffDays < 365) {
+      const months = Math.floor(diffDays / 30);
+      return `${months}mo ago`;
+    } else {
+      const years = Math.floor(diffDays / 365);
+      return `${years}y ago`;
     }
   }
 }

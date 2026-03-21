@@ -14,6 +14,7 @@ import {
   useDirectoryEntries,
   type DirectoryEntry,
 } from "@renderer/stores/useFileStore";
+import { GitLogDialog } from "@renderer/components/git";
 
 interface FileTreeProps {
   className?: string;
@@ -95,6 +96,7 @@ function FileTreeComponent({
 
   // Store state
   const projectPath = useFileStore((state) => state.projectPath);
+  const gitStatus = useFileStore((state) => state.gitStatus);
   const expandedFolders = useFileStore((state) => state.expandedFolders);
   const selectedPath = useFileStore((state) => state.selectedPath);
   const getFileGitStatus = useFileStore((state) => state.getFileGitStatus);
@@ -122,6 +124,8 @@ function FileTreeComponent({
     parentPath: string;
     type: "file" | "folder";
   } | null>(null);
+
+  const [gitLogOpen, setGitLogOpen] = useState(false);
 
   // Get root entries
   const rootEntries = useDirectoryEntries(projectPath || "");
@@ -483,6 +487,7 @@ function FileTreeComponent({
           position={contextMenu.position}
           targetPath={contextMenu.entry.path}
           isDirectory={contextMenu.entry.isDirectory}
+          isGitRepo={gitStatus?.isGitRepo ?? false}
           onClose={closeContextMenu}
           onCreateFile={handleCreateFileDialog}
           onCreateDirectory={handleCreateDirectoryDialog}
@@ -490,6 +495,7 @@ function FileTreeComponent({
           onDelete={handleDelete}
           onCopyPath={(path) => navigator.clipboard.writeText(path)}
           onRefresh={loadDirectory}
+          onViewGitHistory={() => setGitLogOpen(true)}
         />
       )}
 
@@ -498,10 +504,21 @@ function FileTreeComponent({
         <EmptySpaceContextMenu
           position={emptyContextMenu.position}
           currentPath={emptyContextMenu.path}
+          isGitRepo={gitStatus?.isGitRepo ?? false}
           onClose={closeContextMenu}
           onCreateFile={handleCreateFileDialog}
           onCreateDirectory={handleCreateDirectoryDialog}
           onRefresh={loadDirectory}
+          onViewGitHistory={() => setGitLogOpen(true)}
+        />
+      )}
+
+      {/* Git Log Dialog */}
+      {projectPath && (
+        <GitLogDialog
+          open={gitLogOpen}
+          onOpenChange={setGitLogOpen}
+          projectPath={projectPath}
         />
       )}
     </div>

@@ -132,4 +132,52 @@ export function registerGitHandlers(): void {
       }
     }
   );
+
+  // Get git log for a repository
+  ipcMain.handle("git:get-log", async (_event, repoPath: string, maxCount?: number) => {
+    try {
+      const pathValidation = validatePath(repoPath);
+      if (!pathValidation.valid) {
+        console.error("[gitHandlers] Invalid repoPath:", pathValidation.error);
+        return {
+          commits: [],
+          hasMore: false,
+          isGitRepo: false,
+        };
+      }
+
+      return await gitService.getLog(pathValidation.resolved!, maxCount);
+    } catch (error) {
+      console.error("[gitHandlers] get-log error:", error);
+      return {
+        commits: [],
+        hasMore: false,
+        isGitRepo: false,
+      };
+    }
+  });
+
+  // Get commit diff for a specific commit
+  ipcMain.handle("git:get-commit-diff", async (_event, repoPath: string, commitHash: string) => {
+    try {
+      const pathValidation = validatePath(repoPath);
+      if (!pathValidation.valid) {
+        console.error("[gitHandlers] Invalid repoPath:", pathValidation.error);
+        return {
+          commitHash,
+          files: [],
+          hasMore: false,
+        };
+      }
+
+      return await gitService.getCommitDiff(pathValidation.resolved!, commitHash);
+    } catch (error) {
+      console.error("[gitHandlers] get-commit-diff error:", error);
+      return {
+        commitHash,
+        files: [],
+        hasMore: false,
+      };
+    }
+  });
 }
