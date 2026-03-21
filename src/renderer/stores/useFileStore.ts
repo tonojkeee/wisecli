@@ -4,6 +4,64 @@ import type { DirectoryEntry, GitStatusResult, GitFileStatus } from "@shared/typ
 // Re-export for components
 export type { DirectoryEntry, GitStatusResult, GitFileStatus };
 
+// Maximum number of directories to cache (LRU eviction)
+const MAX_CACHED_DIRECTORIES = 100;
+
+/**
+ * LRU Cache implementation for directory entries
+ * Prevents unbounded memory growth from cached directories
+ */
+class LRUDirectoryCache {
+  private cache: Map<string, DirectoryEntry[]> = new Map();
+  private accessOrder: string[] = [];
+
+  get(key: string): DirectoryEntry[] | undefined {
+    const value = this.cache.get(key);
+    if (value !== undefined) {
+      // Move to end (most recently used)
+      this.accessOrder = this.accessOrder.filter((k) => k !== key);
+      this.accessOrder.push(key);
+    }
+    return value;
+  }
+
+  set(key: string, value: DirectoryEntry[]): void {
+    // Remove if exists (to update access order)
+    if (this.cache.has(key)) {
+      this.accessOrder = this.accessOrder.filter((k) => k !== key);
+    }
+
+    // Evict oldest if at capacity
+    while (this.accessOrder.length >= MAX_CACHED_DIRECTORIES) {
+      const oldest = this.accessOrder.shift();
+      if (oldest) {
+        this.cache.delete(oldest);
+      }
+    }
+
+    this.cache.set(key, value);
+    this.accessOrder.push(key);
+  }
+
+  delete(key: string): boolean {
+    this.accessOrder = this.accessOrder.filter((k) => k !== key);
+    return this.cache.delete(key);
+  }
+
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+
+  clear(): void {
+    this.cache.clear();
+    this.accessOrder = [];
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
+}
+
 export interface OpenFile {
   path: string;
   name: string;
@@ -18,8 +76,8 @@ interface FileState {
   // Project root
   projectPath: string | null;
 
-  // Directory cache - path -> entries
-  directoryCache: Map<string, DirectoryEntry[]>;
+  // Directory cache with LRU eviction - path -> entries
+  directoryCache: LRUDirectoryCache;
 
   // Expanded folders in tree
   expandedFolders: Set<string>;
@@ -131,7 +189,7 @@ const getLanguageFromExtension = (extension: string): string => {
 
 export const useFileStore = create<FileState>((set, get) => ({
   projectPath: null,
-  directoryCache: new Map(),
+  directoryCache: new LRUDirectoryCache(),
   expandedFolders: new Set(),
   selectedPath: null,
   openFiles: new Map(),
@@ -157,9 +215,8 @@ export const useFileStore = create<FileState>((set, get) => ({
       const result = await window.electronAPI.fs.listDirectory(dirPath);
       if (result.success && result.data) {
         set((state) => {
-          const newCache = new Map(state.directoryCache);
-          newCache.set(dirPath, result.data!);
-          return { directoryCache: newCache, isLoadingDirectory: false };
+          state.directoryCache.set(dirPath, result.data!);
+          return { directoryCache: state.directoryCache, isLoadingDirectory: false };
         });
       } else {
         set({ error: result.error || "Failed to load directory", isLoadingDirectory: false });
@@ -442,11 +499,10 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   refreshDirectory: async (dirPath) => {
-    // Clear cache and reload
+    // Clear cache entry and reload
     set((state) => {
-      const newCache = new Map(state.directoryCache);
-      newCache.delete(dirPath);
-      return { directoryCache: newCache };
+      state.directoryCache.delete(dirPath);
+      return { directoryCache: state.directoryCache };
     });
     await get().loadDirectory(dirPath);
   },

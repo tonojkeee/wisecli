@@ -61,9 +61,16 @@ class GlmChatService extends EventEmitter {
     // Cancel any existing stream for this conversation
     this.cancelStream(conversationId);
 
-    // Create new abort controller
+    // Create new abort controller with connection timeout
     const abortController = new AbortController();
     this.abortControllers.set(conversationId, abortController);
+
+    // Connection timeout to prevent hanging on network issues
+    const CONNECTION_TIMEOUT_MS = 30000;
+    const connectionTimeout = setTimeout(() => {
+      abortController.abort();
+      debug.warn(`[GlmChatService] Connection timeout after ${CONNECTION_TIMEOUT_MS}ms for ${conversationId}`);
+    }, CONNECTION_TIMEOUT_MS);
 
     const baseUrl = settings.baseUrl || DEFAULT_GLM5_SETTINGS.baseUrl;
     const url = `${baseUrl}${GLM5_API_ENDPOINT}`;
@@ -119,6 +126,9 @@ class GlmChatService extends EventEmitter {
 
       const response = await fetch(url, fetchOptions);
 
+      // Connection succeeded, clear the connection timeout
+      clearTimeout(connectionTimeout);
+
       debug.log(`[GlmChatService] Response status: ${response.status}`);
 
       if (!response.ok) {
@@ -142,7 +152,19 @@ class GlmChatService extends EventEmitter {
       let buffer = "";
 
       while (true) {
-        const { done, value } = await reader.read();
+        let readResult;
+        try {
+          readResult = await reader.read();
+        } catch (readError) {
+          // Handle abort from connection timeout or user cancellation
+          if (readError instanceof Error && readError.name === "AbortError") {
+            debug.log(`[GlmChatService] Stream read aborted for ${conversationId}`);
+            return;
+          }
+          throw new Error(`Stream read error: ${readError instanceof Error ? readError.message : String(readError)}`);
+        }
+
+        const { done, value } = readResult;
 
         if (done) {
           break;
@@ -317,6 +339,7 @@ class GlmChatService extends EventEmitter {
       onEvent({ type: "error", data: errorEvent });
       this.emit("error", errorEvent);
     } finally {
+      clearTimeout(connectionTimeout);
       this.abortControllers.delete(conversationId);
     }
   }

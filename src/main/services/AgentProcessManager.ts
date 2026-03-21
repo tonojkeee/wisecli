@@ -348,6 +348,14 @@ class AgentProcessManager extends EventEmitter {
         ptyProcess = pty.spawn(claudeCommand, spawnArgs, ptyOptions);
       }
     } catch (spawnError) {
+      // Cleanup resources on spawn failure to prevent memory leaks
+      this.outputBuffers.delete(agentId);
+      this.statusTimeouts.delete(agentId);
+      this.todoParseBuffers.delete(agentId);
+      this.todoParseTimeouts.delete(agentId);
+      this.pendingOutputs.delete(agentId);
+      this.flushTimeouts.delete(agentId);
+
       const errorMsg = spawnError instanceof Error ? spawnError.message : String(spawnError);
       debug.error("[AgentProcessManager] PTY spawn failed:", errorMsg);
       this.sendToRenderer("agent:error", {
@@ -624,6 +632,23 @@ class AgentProcessManager extends EventEmitter {
         // On Unix, try SIGTERM first for graceful shutdown
         // node-pty will fall back to SIGKILL if needed
         agent.pty.kill("SIGTERM");
+
+        // Force kill timeout - ensure process doesn't become zombie
+        const forceKillTimeout = setTimeout(() => {
+          try {
+            // Try to kill the process group (negative PID) to ensure all children are killed
+            if (agent.pty.pid) {
+              process.kill(-agent.pty.pid, "SIGKILL");
+            }
+          } catch {
+            // Process already dead, ignore
+          }
+        }, 5000);
+
+        // Clear timeout when process exits cleanly
+        agent.pty.onExit(() => {
+          clearTimeout(forceKillTimeout);
+        });
       }
     } catch {
       // PTY may already be dead

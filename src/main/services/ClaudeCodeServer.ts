@@ -289,8 +289,34 @@ class ClaudeCodeServer {
     this.connectedClients.add(ws);
     debug.log("[ClaudeCodeServer] Client connected");
 
+    // Create callback wrappers for cleanup on disconnect
+    const statusCallback = (status: ClaudeCodeStatus) => {
+      // Forward to window if still connected
+      if (ws.readyState === WebSocket.OPEN) {
+        BrowserWindow.getAllWindows().forEach((win) => {
+          win.webContents.send("claude-code:status", status);
+        });
+      }
+    };
+
+    const openFileCallback = (payload: OpenFilePayload) => {
+      // Forward to window if still connected
+      if (ws.readyState === WebSocket.OPEN) {
+        BrowserWindow.getAllWindows().forEach((win) => {
+          win.webContents.send("claude-code:open-file", payload);
+        });
+      }
+    };
+
+    // Register callbacks
+    this.statusCallbacks.add(statusCallback);
+    this.openFileCallbacks.add(openFileCallback);
+
     ws.on("close", () => {
       this.connectedClients.delete(ws);
+      // Cleanup callbacks to prevent memory leak
+      this.statusCallbacks.delete(statusCallback);
+      this.openFileCallbacks.delete(openFileCallback);
       if (this.connectedClients.size === 0) {
         this.notifyStatus("disconnected");
       }

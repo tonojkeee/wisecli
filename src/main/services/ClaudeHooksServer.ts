@@ -389,6 +389,10 @@ class ClaudeHooksServer {
    * Cleanup resources
    */
   private cleanup(): void {
+    // Clear all callbacks to prevent memory leaks
+    this.updateCallbacks.clear();
+    this.clearCallbacks.clear();
+
     if (this.socketPath) {
       try {
         fs.unlinkSync(this.socketPath);
