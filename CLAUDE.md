@@ -33,6 +33,73 @@ pnpm typecheck    # Run TypeScript type checking without emitting
 
 Note: `pnpm install` runs `electron-builder install-app-deps` automatically to rebuild native modules like `node-pty`.
 
+## Git Workflow and Commit Conventions
+
+These conventions are **mandatory** for all commits and branches:
+
+### Branch Naming
+
+Use descriptive names with prefixes:
+- `feature/название-фичи` — new functionality
+- `fix/название-бага` — bug fixes
+- `chore/описание` — technical changes
+- `refactor/описание` — code refactoring
+
+### Commit Message Format (Conventional Commits)
+
+**Always use this format:**
+```
+<тип>(<область>): <описание>
+```
+
+**Types:**
+| Type | Description | Example |
+|------|-------------|---------|
+| `feat` | New feature | `feat(git): add commit history viewer` |
+| `fix` | Bug fix | `fix(terminal): resolve resize issue` |
+| `refactor` | Refactoring without behavior change | `refactor(agent): simplify process manager` |
+| `chore` | Technical changes | `chore: bump version to 0.1.2` |
+| `docs` | Documentation | `docs: update README` |
+| `style` | Formatting | `style: fix indentation` |
+| `test` | Tests | `test: add unit tests for GitService` |
+
+**Scopes (optional but recommended):**
+- `git`, `main`, `renderer`, `terminal`, `editor`, `i18n`, `ipc`
+
+**Examples from project history:**
+```
+feat(git): add Git History viewer with diff support
+fix: security improvements and code cleanup
+chore: bump version to 0.1.2
+refactor: migrate terminal runtime from ghostty-web to xterm
+```
+
+### Pre-Commit and Pre-Push Checks
+
+**Before committing** (automatic via pre-commit hook):
+- ESLint runs automatically
+- Prettier formats code
+
+**Before pushing** (run manually):
+```bash
+pnpm typecheck    # TypeScript type check
+pnpm lint         # ESLint check
+```
+
+**Before Pull Request:**
+```bash
+pnpm build        # Full production build
+```
+
+### Workflow
+
+1. **Start work:** `git checkout main && git pull origin main`
+2. **Create branch:** `git checkout -b feature/my-feature`
+3. **Make changes and commit:** Follow commit format above
+4. **Push:** `git push -u origin feature/my-feature`
+5. **Create PR** on GitHub, wait for review
+6. **After merge:** `git checkout main && git pull origin main`
+
 ## Architecture
 
 ### Electron Process Model
