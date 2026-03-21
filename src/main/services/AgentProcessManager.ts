@@ -111,10 +111,12 @@ function resolveClaudeCommandPath(): Promise<string | null> {
         if (error) {
           debug.warn("[AgentProcessManager] Failed to resolve Claude CLI on Windows:", error.message);
 
-          // Fallback: check common npm locations directly
+          // Fallback: check common npm/node installation locations directly
           const fallbackPaths = [
             process.env.APPDATA ? path.join(process.env.APPDATA, "npm", "claude.cmd") : null,
+            process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "npm", "claude.cmd") : null,
             process.env.NVM_SYMLINK ? path.join(process.env.NVM_SYMLINK, "claude.cmd") : null,
+            process.env.NVM_HOME ? path.join(process.env.NVM_HOME, "claude.cmd") : null,
           ].filter(Boolean) as string[];
 
           for (const fallbackPath of fallbackPaths) {
@@ -261,13 +263,11 @@ class AgentProcessManager extends EventEmitter {
     const resolvedClaudePath = await resolveClaudeCommandPath();
     const claudeCommand = resolvedClaudePath || (isWindows ? "claude.cmd" : "claude");
 
-    if (isWindows && !resolvedClaudePath) {
-      throw new Error(
-        "Claude CLI not found in PATH. Please install Claude Code and ensure `claude.cmd` is available in your system PATH."
-      );
-    }
-
     debug.log("[AgentProcessManager] Using Claude executable:", claudeCommand);
+
+    if (isWindows && !resolvedClaudePath) {
+      debug.warn("[AgentProcessManager] Claude CLI not found via path resolution, relying on enhanced PATH and spawn fallback");
+    }
 
     // Build spawn args - add --resume flag if we have a session ID to resume
     const spawnArgs: string[] = [];
@@ -283,10 +283,14 @@ class AgentProcessManager extends EventEmitter {
       const additionalPaths: string[] = [];
 
       const npmGlobal = process.env.APPDATA ? path.join(process.env.APPDATA, "npm") : null;
+      const npmLocal = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "npm") : null;
       const nvmSymlink = process.env.NVM_SYMLINK;
+      const nvmHome = process.env.NVM_HOME;
 
       if (npmGlobal && existsSync(npmGlobal)) additionalPaths.push(npmGlobal);
+      if (npmLocal && existsSync(npmLocal)) additionalPaths.push(npmLocal);
       if (nvmSymlink && existsSync(nvmSymlink)) additionalPaths.push(nvmSymlink);
+      if (nvmHome && existsSync(nvmHome) && !nvmSymlink) additionalPaths.push(nvmHome);
 
       if (additionalPaths.length > 0) {
         enhancedPath = enhancedPath + pathSep + additionalPaths.join(pathSep);
@@ -320,8 +324,10 @@ class AgentProcessManager extends EventEmitter {
     try {
       if (isWindows) {
         // On Windows, pass command through cmd.exe for proper .cmd file handling
+        // /s flag handles quote stripping; wrap claudeCommand in quotes for paths with spaces
         const shell = process.env.ComSpec || "cmd.exe";
-        const cmdArgs = ["/d", "/s", "/c", claudeCommand, ...spawnArgs];
+        const quotedCommand = claudeCommand.includes(" ") ? `"${claudeCommand}"` : claudeCommand;
+        const cmdArgs = ["/d", "/s", "/c", quotedCommand, ...spawnArgs];
         debug.log("[AgentProcessManager] Windows spawn:", shell, cmdArgs.join(" "));
         ptyProcess = pty.spawn(shell, cmdArgs, ptyOptions);
       } else {

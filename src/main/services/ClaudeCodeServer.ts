@@ -150,7 +150,10 @@ class ClaudeCodeServer {
     };
     await fs.promises.writeFile(this.lockFilePath, JSON.stringify(lockData));
     // SECURITY: Restrict lock file permissions to owner only (prevent token theft)
-    await fs.promises.chmod(this.lockFilePath, 0o600);
+    // On Windows, chmod is a no-op for NTFS ACLs — this only has effect on Unix/macOS.
+    if (process.platform !== "win32") {
+      await fs.promises.chmod(this.lockFilePath, 0o600);
+    }
 
     // Setup cleanup on exit
     process.once("exit", () => this.cleanupSync());
