@@ -25,24 +25,30 @@ const isWindows = process.platform === "win32";
 
 /**
  * Parse status line input from Claude Code
- * Calculates cumulative context usage for the entire session
+ * Calculates context usage from token counts for accuracy
  */
 function parseStatuslineInput(input: StatuslineInput): DisplayStatusline {
-  // Calculate cumulative context usage: (total_input + total_output) / context_window_size * 100
-  const totalInputTokens = input.context_window?.total_input_tokens ?? 0;
-  const totalOutputTokens = input.context_window?.total_output_tokens ?? 0;
-  const contextWindowSize = input.context_window?.context_window_size ?? 0;
+  // Get current context window usage (not cumulative session totals)
+  const currentUsage = input.context_window?.current_usage;
+  const contextUsedTokens = currentUsage
+    ? currentUsage.input_tokens + currentUsage.output_tokens
+    : null;
 
-  const totalTokens = totalInputTokens + totalOutputTokens;
-  const cumulativeContextPercent =
-    contextWindowSize > 0 ? (totalTokens / contextWindowSize) * 100 : null;
+  // context_window_size comes as raw tokens (e.g., 200000 for 200K)
+  const contextWindowSize = input.context_window?.context_window_size ?? null;
+
+  // Calculate percentage from token counts (more reliable than used_percentage)
+  const contextUsagePercent =
+    contextUsedTokens != null && contextWindowSize != null && contextWindowSize > 0
+      ? (contextUsedTokens / contextWindowSize) * 100
+      : null;
 
   return {
     model: input.model?.display_name ?? "unknown",
-    contextUsagePercent: cumulativeContextPercent,
-    contextRemainingPercent: input.context_window?.remaining_percentage ?? null,
-    contextUsedTokens: totalTokens,
-    contextWindowSize: contextWindowSize > 0 ? contextWindowSize : null,
+    contextUsagePercent,
+    contextRemainingPercent: contextUsagePercent != null ? 100 - contextUsagePercent : null,
+    contextUsedTokens,
+    contextWindowSize,
     costUsd: input.cost?.total_cost_usd ?? 0,
     cwd: input.cwd ?? "",
     sessionId: input.session_id ?? "",
