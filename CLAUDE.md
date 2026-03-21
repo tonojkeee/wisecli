@@ -35,21 +35,21 @@ Note: `pnpm install` runs `electron-builder install-app-deps` automatically to r
 
 ## Git Workflow and Commit Conventions
 
-These conventions are **mandatory** for all commits and branches:
+Simplified Trunk-Based Development for a 2-person team.
 
-### Branch Naming
+### Workflow Strategy
 
-Use descriptive names with prefixes:
-- `feature/название-фичи` — new functionality
-- `fix/название-бага` — bug fixes
-- `chore/описание` — technical changes
-- `refactor/описание` — code refactoring
+| Change Type | Approach |
+|-------------|----------|
+| Small fixes, refactoring, docs | Commit directly to `main` |
+| Features taking 1-3 hours | Short-lived branch → merge same day |
+| Large features (>1 day) | Branch with frequent commits, PR for review |
 
 ### Commit Message Format (Conventional Commits)
 
 **Always use this format:**
 ```
-<тип>(<область>): <описание>
+<type>(<scope>): <description>
 ```
 
 **Types:**
@@ -66,39 +66,48 @@ Use descriptive names with prefixes:
 **Scopes (optional but recommended):**
 - `git`, `main`, `renderer`, `terminal`, `editor`, `i18n`, `ipc`
 
-**Examples from project history:**
-```
-feat(git): add Git History viewer with diff support
-fix: security improvements and code cleanup
-chore: bump version to 0.1.2
-refactor: migrate terminal runtime from ghostty-web to xterm
+### Daily Workflow
+
+**Quick changes (directly to main):**
+```bash
+git checkout main && git pull
+# make changes
+git add . && git commit -m "fix: minor UI tweak"
+git push
 ```
 
-### Pre-Commit and Pre-Push Checks
+**Feature work (short-lived branch):**
+```bash
+git checkout main && git pull
+git checkout -b feature/quick-feature
+# make changes
+git push -u origin feature/quick-feature
+# create PR, merge, delete branch same day
+```
 
-**Before committing** (automatic via pre-commit hook):
+### Pre-Commit Checks
+
+Automatic via pre-commit hook:
 - ESLint runs automatically
 - Prettier formats code
 
-**Before pushing** (run manually):
+Before pushing (run manually):
 ```bash
 pnpm typecheck    # TypeScript type check
 pnpm lint         # ESLint check
 ```
 
-**Before Pull Request:**
+Before Pull Request:
 ```bash
 pnpm build        # Full production build
 ```
 
-### Workflow
+### Branch Naming (when needed)
 
-1. **Start work:** `git checkout main && git pull origin main`
-2. **Create branch:** `git checkout -b feature/my-feature`
-3. **Make changes and commit:** Follow commit format above
-4. **Push:** `git push -u origin feature/my-feature`
-5. **Create PR** on GitHub, wait for review
-6. **After merge:** `git checkout main && git pull origin main`
+Use descriptive names with prefixes:
+- `feature/name` — new functionality
+- `fix/name` — bug fixes
+- `chore/name` — technical changes
 
 ## Architecture
 
