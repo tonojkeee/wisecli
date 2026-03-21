@@ -2,7 +2,7 @@
 
 # WiseCLI
 
-<img src="resources/icon.png" alt="WiseCLI Logo" width="200">
+<img src="resources/icon.png" alt="WiseCLI Logo" width="512">
 
 **Мощный графический интерфейс для Claude CLI**
 
