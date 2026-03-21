@@ -62,10 +62,6 @@ import type {
   ToolErrorEvent,
   // Hook types
   HookStatus,
-  GitLogCommit as GitLogCommitType,
-  GitLogResult as GitLogResultType,
-  GitDiffFile as GitDiffFileType,
-  GitCommitDiffResult as GitCommitDiffResultType,
 } from "@shared/types";
 
 // Re-export types for renderer

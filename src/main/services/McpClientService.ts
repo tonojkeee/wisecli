@@ -89,6 +89,8 @@ class McpClientService {
   private apiKey: string = "";
   private visionProcess: ChildProcess | null = null;
   private visionProcessReady: boolean = false;
+  // Mutex to prevent race conditions during parallel vision process initialization
+  private visionProcessInitPromise: Promise<void> | null = null;
   private pendingVisionRequests: Map<
     string,
     {
@@ -1149,8 +1151,32 @@ class McpClientService {
 
   /**
    * Ensure the vision MCP process is running
+   * Uses mutex pattern to prevent race conditions during parallel initialization
    */
   private async ensureVisionProcess(): Promise<void> {
+    // Already ready
+    if (this.visionProcess && this.visionProcessReady) {
+      return;
+    }
+
+    // If initialization is in progress, wait for it
+    if (this.visionProcessInitPromise) {
+      return this.visionProcessInitPromise;
+    }
+
+    // Start initialization
+    this.visionProcessInitPromise = this.doEnsureVisionProcess();
+    try {
+      await this.visionProcessInitPromise;
+    } finally {
+      this.visionProcessInitPromise = null;
+    }
+  }
+
+  /**
+   * Internal method that actually starts the vision process
+   */
+  private async doEnsureVisionProcess(): Promise<void> {
     if (this.visionProcess && this.visionProcessReady) {
       return;
     }

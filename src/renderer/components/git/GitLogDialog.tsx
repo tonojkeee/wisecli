@@ -5,7 +5,6 @@ import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { Loader2, GitCommit, FileCode, User, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { GitLogCommit, GitDiffFile } from "@shared/types/fs";
-import { useFileStore } from "@renderer/stores/useFileStore";
 import { useEffectiveTheme } from "@renderer/stores/useSettingsStore";
 
 // Import the loader config to ensure Monaco loads locally
@@ -53,7 +52,6 @@ interface GitLogDialogProps {
 export function GitLogDialog({ open, onOpenChange, projectPath }: GitLogDialogProps) {
   const { t } = useTranslation("filebrowser");
   const effectiveTheme = useEffectiveTheme();
-  const projectRoot = useFileStore((state) => state.projectPath);
 
   // Commits state
   const [commits, setCommits] = useState<GitLogCommit[]>([]);
@@ -197,16 +195,6 @@ export function GitLogDialog({ open, onOpenChange, projectPath }: GitLogDialogPr
     loadFileContent(file);
   }, [loadFileContent]);
 
-  // Format date for display
-  const formatDate = useCallback((dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleString();
-    } catch {
-      return dateStr;
-    }
-  }, []);
-
   // Get file status label
   const getStatusLabel = (status: GitDiffFile["status"]) => {
     const labels: Record<GitDiffFile["status"], string> = {
@@ -228,9 +216,6 @@ export function GitLogDialog({ open, onOpenChange, projectPath }: GitLogDialogPr
     };
     return colors[status] || "text-muted-foreground";
   };
-
-  // Use projectRoot for repo operations
-  const repoPath = projectRoot || projectPath;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

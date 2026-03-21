@@ -8,6 +8,7 @@
 import { BrowserWindow, app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
+import * as fsp from "fs/promises";
 import { EventEmitter } from "events";
 import type {
   ClaudeTask,
@@ -65,9 +66,9 @@ export class ClaudeTaskService extends EventEmitter {
       } else {
         // Read tasks from all sessions
         const basePath = this.getTasksBasePath();
-        if (fs.existsSync(basePath)) {
-          const sessions = fs.readdirSync(basePath, { withFileTypes: true });
-          for (const session of sessions) {
+        try {
+          const entries = await fsp.readdir(basePath, { withFileTypes: true });
+          for (const session of entries) {
             if (session.isDirectory()) {
               const sessionTasks = await this.readTasksFromDirectory(
                 path.join(basePath, session.name),
@@ -76,6 +77,8 @@ export class ClaudeTaskService extends EventEmitter {
               tasks.push(...sessionTasks);
             }
           }
+        } catch {
+          // Directory doesn't exist or can't be read, return empty array
         }
       }
     } catch (error) {
@@ -105,17 +108,13 @@ export class ClaudeTaskService extends EventEmitter {
   ): Promise<ClaudeTask[]> {
     const tasks: ClaudeTask[] = [];
 
-    if (!fs.existsSync(dirPath)) {
-      return tasks;
-    }
-
     try {
-      const files = fs.readdirSync(dirPath);
+      const files = await fsp.readdir(dirPath);
       for (const file of files) {
         if (file.endsWith(".json")) {
           const filePath = path.join(dirPath, file);
           try {
-            const content = fs.readFileSync(filePath, "utf-8");
+            const content = await fsp.readFile(filePath, "utf-8");
             const task = JSON.parse(content) as ClaudeTask;
             // Ensure task has an id (use filename without extension as fallback)
             if (!task.id) {
@@ -132,7 +131,10 @@ export class ClaudeTaskService extends EventEmitter {
         }
       }
     } catch (error) {
-      debug.error(`[ClaudeTaskService] Error reading directory ${dirPath}:`, error);
+      // Directory doesn't exist or can't be read, return empty array
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        debug.error(`[ClaudeTaskService] Error reading directory ${dirPath}:`, error);
+      }
     }
 
     return tasks;
@@ -214,10 +216,8 @@ export class ClaudeTaskService extends EventEmitter {
     }
 
     try {
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(watchPath)) {
-        fs.mkdirSync(watchPath, { recursive: true });
-      }
+      // Create directory if it doesn't exist (async)
+      await fsp.mkdir(watchPath, { recursive: true });
 
       const watcher = fs.watch(
         watchPath,
@@ -532,11 +532,14 @@ export class ClaudeTaskService extends EventEmitter {
       const basePath = this.getSessionTasksPath(sessionId);
       const taskFile = path.join(basePath, `${taskId}.json`);
 
-      if (!fs.existsSync(taskFile)) {
+      // Check if file exists using async access
+      try {
+        await fsp.access(taskFile);
+      } catch {
         return { success: false, error: `Task file not found: ${taskId}` };
       }
 
-      fs.unlinkSync(taskFile);
+      await fsp.unlink(taskFile);
 
       // Notify renderer of the change
       await this.notifyRenderer(sessionId);
@@ -561,42 +564,50 @@ export class ClaudeTaskService extends EventEmitter {
       if (sessionId) {
         // Delete tasks from specific session
         const sessionPath = this.getSessionTasksPath(sessionId);
-        if (fs.existsSync(sessionPath)) {
-          const files = fs.readdirSync(sessionPath);
+        try {
+          const files = await fsp.readdir(sessionPath);
           for (const file of files) {
             if (file.endsWith(".json")) {
               const filePath = path.join(sessionPath, file);
               try {
-                fs.unlinkSync(filePath);
+                await fsp.unlink(filePath);
                 deletedCount++;
               } catch (err) {
                 debug.warn(`[ClaudeTaskService] Failed to delete ${file}:`, err);
               }
             }
           }
+        } catch {
+          // Directory doesn't exist, nothing to delete
         }
       } else {
         // Delete tasks from ALL sessions (iterate through subdirectories)
         const basePath = this.getTasksBasePath();
-        if (fs.existsSync(basePath)) {
-          const sessions = fs.readdirSync(basePath, { withFileTypes: true });
+        try {
+          const sessions = await fsp.readdir(basePath, { withFileTypes: true });
           for (const session of sessions) {
             if (session.isDirectory()) {
               const sessionPath = path.join(basePath, session.name);
-              const files = fs.readdirSync(sessionPath);
-              for (const file of files) {
-                if (file.endsWith(".json")) {
-                  const filePath = path.join(sessionPath, file);
-                  try {
-                    fs.unlinkSync(filePath);
-                    deletedCount++;
-                  } catch (err) {
-                    debug.warn(`[ClaudeTaskService] Failed to delete ${file}:`, err);
+              try {
+                const files = await fsp.readdir(sessionPath);
+                for (const file of files) {
+                  if (file.endsWith(".json")) {
+                    const filePath = path.join(sessionPath, file);
+                    try {
+                      await fsp.unlink(filePath);
+                      deletedCount++;
+                    } catch (err) {
+                      debug.warn(`[ClaudeTaskService] Failed to delete ${file}:`, err);
+                    }
                   }
                 }
+              } catch {
+                // Subdirectory can't be read, skip
               }
             }
           }
+        } catch {
+          // Base directory doesn't exist, nothing to delete
         }
       }
 
